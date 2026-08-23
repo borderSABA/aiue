@@ -3,7 +3,7 @@
 
 const $ = s => document.querySelector(s);
 const screens = [...document.querySelectorAll('.screen')];
-const VERSION = '0.7';
+const VERSION = '0.8';
 const ROOM_COUNT = 4;
 const SERVER_URL = String(window.AIUE_SERVER_URL || '').replace(/\/$/, '');
 const kanaRows = [
@@ -35,6 +35,7 @@ let intentionalClose = false;
 let lastAttackEvent = '';
 let toastTimer = null;
 let roomPollTimer = null;
+let cpuTurnTimer = null;
 
 const clientId = getClientId();
 
@@ -279,9 +280,11 @@ function renderRoomScreen() {
   $('#minLength').disabled = !host;
   $('#maxLength').disabled = !host;
   $('#startWordsBtn').classList.toggle('hidden', !host);
+  $('#addCpuBtn').classList.toggle('hidden', !host);
 
   const full = roomState.players.length === roomState.targetCount;
   $('#startWordsBtn').disabled = !full || roomState.players.length < 2;
+  $('#addCpuBtn').disabled = !host || roomState.players.length >= 10;
   $('#roomGuide').textContent = host
     ? (full ? '参加者が揃いました。ワード入力を開始できます。' : `参加者を待っています（${roomState.players.length}/${roomState.targetCount}人）`)
     : 'ホストが設定して開始するまでお待ちください。';
@@ -291,10 +294,15 @@ function renderRoomScreen() {
       <div class="online-player-name">${escapeHtml(p.name)}</div>
       <div class="online-player-tags">
         ${p.id === roomState.hostId ? '<span class="mini-tag host">HOST</span>' : ''}
+        ${p.isCpu ? '<span class="mini-tag cpu">CPU</span>' : ''}
         ${p.id === roomState.meId ? '<span class="mini-tag me">自分</span>' : ''}
-        <span class="connection-dot ${p.connected ? 'on' : ''}"></span>
+        ${host && p.isCpu ? `<button class="cpu-remove" data-cpu-id="${escapeHtml(p.id)}">削除</button>` : ''}
+        ${p.isCpu ? '' : `<span class="connection-dot ${p.connected ? 'on' : ''}"></span>`}
       </div>
     </div>`).join('');
+  $('#roomPlayers').querySelectorAll('.cpu-remove').forEach(btn => {
+    btn.addEventListener('click', () => send({ type: 'removeCpu', cpuId: btn.dataset.cpuId }));
+  });
 }
 
 function renderWordScreen() {
@@ -350,6 +358,7 @@ function renderGame() {
   renderKana();
   renderStatus();
   renderLog();
+  scheduleCpuTurnIfNeeded();
 }
 
 function renderPlayers() {
@@ -358,31 +367,28 @@ function renderPlayers() {
   root.classList.toggle('many', roomState.players.length >= 7);
   root.innerHTML = roomState.players.map(p => {
     const isMe = p.id === roomState.meId;
-    const displayLength = Number(p.displayLength || (isMe ? p.slots.length : maxLength));
     const slots = [];
-    for (let i = 0; i < displayLength; i++) {
-      const ch = p.slots[i] ?? null;
-      if (isMe) {
-        const hitClass = p.revealed?.[i] ? ' self-hit' : '';
-        slots.push(`<div class="slot own${hitClass}">${escapeHtml(ch || '')}</div>`);
-      } else if (ch !== null) {
-        slots.push(`<div class="slot revealed">${escapeHtml(ch)}</div>`);
+    for (let i = 0; i < maxLength; i++) {
+      const ch = p.slots?.[i] ?? null;
+      if (ch !== null) {
+        slots.push(`<div class="slot revealed${isMe ? ' self-hit' : ''}">${escapeHtml(ch)}</div>`);
       } else {
-        slots.push('<div class="slot hidden">?</div>');
+        slots.push('<div class="slot hidden"></div>');
       }
     }
     const classes = [
       'player-card',
       p.id === roomState.currentId && p.alive ? 'current' : '',
       !p.alive ? 'eliminated' : '',
-      isMe ? 'my-player' : ''
+      isMe ? 'my-player' : '',
+      p.isCpu ? 'cpu-player' : ''
     ].filter(Boolean).join(' ');
     return `<div class="${classes}">
       ${!p.alive ? '<div class="eliminated-tag">脱落</div>' : ''}
       <div class="player-head">
-        <div class="player-name">${escapeHtml(p.name)}${isMe ? '<span class="you-mark">自分</span>' : ''}</div>
+        <div class="player-name">${escapeHtml(p.name)}${p.isCpu ? '<span class="cpu-mark">CPU</span>' : ''}${isMe ? '<span class="you-mark">自分</span>' : ''}</div>
       </div>
-      <div class="word-slots" style="--slot-count:${Math.max(2, displayLength)}">${slots.join('')}</div>
+      <div class="word-slots" style="--slot-count:${maxLength}">${slots.join('')}</div>
     </div>`;
   }).join('');
 }
@@ -450,6 +456,24 @@ function showAttack(name, kana, hit) {
     result.classList.add(hit ? 'hit' : 'miss');
   }, 650);
   setTimeout(() => overlay.classList.remove('show'), 1550);
+}
+
+function scheduleCpuTurnIfNeeded() {
+  clearTimeout(cpuTurnTimer);
+  cpuTurnTimer = null;
+  if (!roomState || roomState.phase !== 'playing') return;
+  const current = roomState.players.find(p => p.id === roomState.currentId);
+  if (!current?.isCpu || !current.alive || !roomState.turnToken) return;
+  const token = roomState.turnToken;
+  cpuTurnTimer = setTimeout(() => {
+    if (!roomState || roomState.phase !== 'playing' || roomState.turnToken !== token) return;
+    send({ type: 'cpuTick', turnToken: token });
+  }, 1200);
+}
+
+function addCpu() {
+  if (!isHost()) return;
+  send({ type: 'addCpu' });
 }
 
 function send(payload) {
@@ -521,6 +545,8 @@ async function resetCurrentRoom() {
 }
 
 function leaveRoom() {
+  clearTimeout(cpuTurnTimer);
+  cpuTurnTimer = null;
   if (socket?.readyState === WebSocket.OPEN) send({ type: 'leave' });
   intentionalClose = true;
   try { socket?.close(1000, 'left'); } catch {}
@@ -534,6 +560,8 @@ function leaveRoom() {
 }
 
 function closeSocket(markIntentional = true) {
+  clearTimeout(cpuTurnTimer);
+  cpuTurnTimer = null;
   if (!socket) return;
   if (markIntentional) intentionalClose = true;
   try { socket.close(); } catch {}
@@ -550,6 +578,7 @@ $('#maxLength').addEventListener('change', () => {
   syncConfig();
 });
 $('#themeInput').addEventListener('change', syncConfig);
+$('#addCpuBtn').addEventListener('click', addCpu);
 $('#startWordsBtn').addEventListener('click', startWords);
 $('#saveWordBtn').addEventListener('click', submitWord);
 $('#attackBtn').addEventListener('click', attackSelected);
@@ -581,6 +610,7 @@ roomPollTimer = setInterval(() => {
   if (selectedRoom === null) fetchRooms();
 }, 3000);
 window.addEventListener('beforeunload', () => {
+  clearTimeout(cpuTurnTimer);
   try { socket?.close(); } catch {}
 });
 })();

@@ -3,7 +3,7 @@
 
 const $ = s => document.querySelector(s);
 const screens = [...document.querySelectorAll('.screen')];
-const VERSION = '0.9';
+const VERSION = '0.10';
 const ROOM_COUNT = 4;
 const SERVER_URL = String(window.AIUE_SERVER_URL || '').replace(/\/$/, '');
 const kanaRows = [
@@ -247,6 +247,10 @@ function handleServerMessage(msg) {
 
 function routeFromState() {
   if (!roomState) return;
+  // Defensive normalization: a stale browser cache or older server state must not stop rendering.
+  if (!Array.isArray(roomState.players)) roomState.players = [];
+  if (!Array.isArray(roomState.used)) roomState.used = [];
+  if (!Array.isArray(roomState.logs)) roomState.logs = [];
   $('#roomChip').textContent = `ROOM ${roomState.roomNo}`;
   if (roomState.phase === 'lobby') {
     show('roomScreen');
@@ -355,19 +359,19 @@ function attackSelected() {
 
 function renderGame() {
   if (!roomState) return;
-  renderPlayers();
-  renderKana();
-  renderStatus();
-  renderLog();
+  try { renderPlayers(); } catch (e) { console.error('renderPlayers failed', e); }
+  try { renderKana(); } catch (e) { console.error('renderKana failed', e); }
+  try { renderStatus(); } catch (e) { console.error('renderStatus failed', e); }
+  try { renderLog(); } catch (e) { console.error('renderLog failed', e); }
   scheduleCpuTurnIfNeeded();
 }
 
 function renderPlayers() {
   const maxLength = roomState.maxLength || 10;
-  const players = roomState.players || [];
-  const splitAt = Math.ceil(players.length / 2);
+  const players = Array.isArray(roomState.players) ? roomState.players : [];
+  const splitAt = Math.min(5, Math.ceil(players.length / 2));
   const left = players.slice(0, splitAt);
-  const right = players.slice(splitAt);
+  const right = players.slice(splitAt, splitAt + 5);
 
   const cardHtml = p => {
     const isMe = p.id === roomState.meId;
@@ -396,8 +400,17 @@ function renderPlayers() {
     </div>`;
   };
 
-  $('#playersLeft').innerHTML = left.map(cardHtml).join('');
-  $('#playersRight').innerHTML = right.map(cardHtml).join('');
+  const leftRoot = $('#playersLeft');
+  const rightRoot = $('#playersRight');
+  if (leftRoot && rightRoot) {
+    leftRoot.innerHTML = left.map(cardHtml).join('');
+    rightRoot.innerHTML = right.map(cardHtml).join('');
+    return;
+  }
+
+  // Compatibility fallback for an older cached HTML layout.
+  const legacyRoot = $('#players');
+  if (legacyRoot) legacyRoot.innerHTML = players.map(cardHtml).join('');
 }
 
 function renderKana() {

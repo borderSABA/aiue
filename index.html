@@ -4,15 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#17110d">
-  <title>あいうえバトル Web v0.8</title>
+  <title>あいうえバトル Web v0.9</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand">あいうえバトル <span>Web v0.7</span></div>
+    <div class="brand">あいうえバトル <span>Web v0.9</span></div>
     <div class="room-chip" id="roomChip">ロビー</div>
     <div class="top-actions">
+      <button class="small hidden" id="logBtn">ログ</button>
       <button class="small" id="ruleBtn">ルール</button>
       <button class="small danger hidden" id="roomResetBtn">部屋を初期化</button>
       <button class="small hidden" id="leaveRoomBtn">退出</button>
@@ -91,9 +92,8 @@
 
     <section id="gameScreen" class="screen game-screen">
       <div class="game-layout">
-        <section class="players-panel">
-          <div class="section-title">PLAYERS</div>
-          <div id="players" class="players"></div>
+        <section class="players-panel left-players-panel">
+          <div id="playersLeft" class="players-side"></div>
         </section>
 
         <section class="center-panel">
@@ -117,10 +117,9 @@
           <div class="message-strip" id="messageStrip">待機中</div>
         </section>
 
-        <aside class="log-panel">
-          <div class="section-title">LOG</div>
-          <div id="log" class="log"></div>
-        </aside>
+        <section class="players-panel right-players-panel">
+          <div id="playersRight" class="players-side"></div>
+        </section>
       </div>
     </section>
 
@@ -145,6 +144,11 @@
       <div id="attackResult" class="attack-result"></div>
     </div>
   </div>
+
+  <dialog id="logDialog" class="log-dialog">
+    <div class="dialog-head"><h2>進行ログ</h2><button class="small" id="closeLogBtn">閉じる</button></div>
+    <div id="logModal" class="log modal-log"></div>
+  </dialog>
 
   <dialog id="ruleDialog">
     <h2>ルール</h2>

@@ -3,7 +3,7 @@
 
 const $ = s => document.querySelector(s);
 const screens = [...document.querySelectorAll('.screen')];
-const VERSION = '0.8';
+const VERSION = '0.9';
 const ROOM_COUNT = 4;
 const SERVER_URL = String(window.AIUE_SERVER_URL || '').replace(/\/$/, '');
 const kanaRows = [
@@ -67,6 +67,7 @@ function show(id) {
   $('#roomChip').textContent = inRoom ? `ROOM ${selectedRoom}` : 'ロビー';
   $('#roomResetBtn').classList.toggle('hidden', !inRoom);
   $('#leaveRoomBtn').classList.toggle('hidden', !inRoom);
+  $('#logBtn').classList.toggle('hidden', !(id === 'gameScreen' || id === 'resultScreen'));
 }
 
 function toast(message, ms = 2600) {
@@ -362,10 +363,13 @@ function renderGame() {
 }
 
 function renderPlayers() {
-  const root = $('#players');
   const maxLength = roomState.maxLength || 10;
-  root.classList.toggle('many', roomState.players.length >= 7);
-  root.innerHTML = roomState.players.map(p => {
+  const players = roomState.players || [];
+  const splitAt = Math.ceil(players.length / 2);
+  const left = players.slice(0, splitAt);
+  const right = players.slice(splitAt);
+
+  const cardHtml = p => {
     const isMe = p.id === roomState.meId;
     const slots = [];
     for (let i = 0; i < maxLength; i++) {
@@ -373,7 +377,7 @@ function renderPlayers() {
       if (ch !== null) {
         slots.push(`<div class="slot revealed${isMe ? ' self-hit' : ''}">${escapeHtml(ch)}</div>`);
       } else {
-        slots.push('<div class="slot hidden"></div>');
+        slots.push('<div class="slot hidden">?</div>');
       }
     }
     const classes = [
@@ -390,8 +394,12 @@ function renderPlayers() {
       </div>
       <div class="word-slots" style="--slot-count:${maxLength}">${slots.join('')}</div>
     </div>`;
-  }).join('');
+  };
+
+  $('#playersLeft').innerHTML = left.map(cardHtml).join('');
+  $('#playersRight').innerHTML = right.map(cardHtml).join('');
 }
+
 function renderKana() {
   if (!roomState) return;
   const me = roomState.players.find(p => p.id === roomState.meId);
@@ -431,7 +439,10 @@ function renderStatus() {
 }
 
 function renderLog() {
-  $('#log').innerHTML = (roomState.logs || []).map(x => `<div class="log-item ${escapeHtml(x.type || '')}">${escapeHtml(x.text)}</div>`).join('');
+  const target = $('#logModal');
+  if (!target) return;
+  target.innerHTML = (roomState.logs || []).map(x => `<div class="log-item ${escapeHtml(x.type || '')}">${escapeHtml(x.text)}</div>`).join('');
+  target.scrollTop = target.scrollHeight;
 }
 
 function renderResult() {
@@ -593,6 +604,15 @@ $('#roomResetBtn').addEventListener('click', resetCurrentRoom);
 $('#leaveRoomBtn').addEventListener('click', leaveRoom);
 $('#againBtn').addEventListener('click', () => send({ type: 'restart' }));
 $('#backLobbyBtn').addEventListener('click', leaveRoom);
+$('#logBtn').addEventListener('click', () => {
+  renderLog();
+  const d = $('#logDialog');
+  if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+});
+$('#closeLogBtn').addEventListener('click', () => {
+  const d = $('#logDialog');
+  if (d.close) d.close(); else d.removeAttribute('open');
+});
 $('#ruleBtn').addEventListener('click', () => {
   const d = $('#ruleDialog');
   if (d.showModal) d.showModal(); else d.setAttribute('open', '');

@@ -3,7 +3,7 @@
 
 const $ = s => document.querySelector(s);
 const screens = [...document.querySelectorAll('.screen')];
-const VERSION = '0.6';
+const VERSION = '0.7';
 const ROOM_COUNT = 4;
 const SERVER_URL = String(window.AIUE_SERVER_URL || '').replace(/\/$/, '');
 const kanaRows = [
@@ -139,14 +139,24 @@ async function resetRoomFromLobby(room) {
   }
 }
 
-function makeTargetOptions() {
-  const select = $('#targetCount');
-  select.innerHTML = '';
+function makeNumberOptions() {
+  const target = $('#targetCount');
+  target.innerHTML = '';
   for (let n = 2; n <= 10; n++) {
     const opt = document.createElement('option');
     opt.value = String(n);
     opt.textContent = `${n}人`;
-    select.append(opt);
+    target.append(opt);
+  }
+  for (const id of ['minLength', 'maxLength']) {
+    const select = $('#' + id);
+    select.innerHTML = '';
+    for (let n = 2; n <= 10; n++) {
+      const opt = document.createElement('option');
+      opt.value = String(n);
+      opt.textContent = `${n}文字`;
+      select.append(opt);
+    }
   }
 }
 
@@ -262,9 +272,12 @@ function renderRoomScreen() {
   $('#hostBadge').textContent = host ? 'あなたがホスト' : '参加者';
   $('#themeInput').value = roomState.theme || '食べ物';
   $('#targetCount').value = String(roomState.targetCount || 2);
+  $('#minLength').value = String(roomState.minLength || 2);
+  $('#maxLength').value = String(roomState.maxLength || 10);
   $('#themeInput').disabled = !host;
   $('#targetCount').disabled = !host;
-  $('#saveConfigBtn').classList.toggle('hidden', !host);
+  $('#minLength').disabled = !host;
+  $('#maxLength').disabled = !host;
   $('#startWordsBtn').classList.toggle('hidden', !host);
 
   const full = roomState.players.length === roomState.targetCount;
@@ -290,6 +303,8 @@ function renderWordScreen() {
   if (!me) return;
   $('#wordPlayerName').textContent = me.name;
   $('#wordTheme').textContent = roomState.theme;
+  $('#wordInput').placeholder = `${roomState.minLength || 2}〜${roomState.maxLength || 10}文字`;
+  $('#wordInput').maxLength = roomState.maxLength || 10;
   $('#wordEntryArea').classList.toggle('hidden', me.ready);
   $('#wordWaitingArea').classList.toggle('hidden', !me.ready);
   $('#readyCounter').textContent = `入力済み ${roomState.readyCount}/${roomState.targetCount}人　ほかのプレイヤーを待っています。`;
@@ -339,31 +354,38 @@ function renderGame() {
 
 function renderPlayers() {
   const root = $('#players');
+  const maxLength = roomState.maxLength || 10;
+  root.classList.toggle('many', roomState.players.length >= 7);
   root.innerHTML = roomState.players.map(p => {
-    const open = p.slots.filter(ch => ch !== null).length;
+    const isMe = p.id === roomState.meId;
+    const displayLength = Number(p.displayLength || (isMe ? p.slots.length : maxLength));
     const slots = [];
-    for (let i = 0; i < 10; i++) {
-      if (i >= p.wordLength) slots.push('<div class="slot empty">×</div>');
-      else if (p.slots[i] !== null) slots.push(`<div class="slot revealed">${escapeHtml(p.slots[i])}</div>`);
-      else slots.push('<div class="slot hidden">?</div>');
+    for (let i = 0; i < displayLength; i++) {
+      const ch = p.slots[i] ?? null;
+      if (isMe) {
+        const hitClass = p.revealed?.[i] ? ' self-hit' : '';
+        slots.push(`<div class="slot own${hitClass}">${escapeHtml(ch || '')}</div>`);
+      } else if (ch !== null) {
+        slots.push(`<div class="slot revealed">${escapeHtml(ch)}</div>`);
+      } else {
+        slots.push('<div class="slot hidden">?</div>');
+      }
     }
     const classes = [
       'player-card',
       p.id === roomState.currentId && p.alive ? 'current' : '',
       !p.alive ? 'eliminated' : '',
-      p.id === roomState.meId ? 'my-player' : ''
+      isMe ? 'my-player' : ''
     ].filter(Boolean).join(' ');
     return `<div class="${classes}">
       ${!p.alive ? '<div class="eliminated-tag">脱落</div>' : ''}
       <div class="player-head">
-        <div class="player-name">${escapeHtml(p.name)}${p.id === roomState.meId ? '<span class="you-mark">自分</span>' : ''}</div>
-        <div class="life">公開 ${open}/${p.wordLength}</div>
+        <div class="player-name">${escapeHtml(p.name)}${isMe ? '<span class="you-mark">自分</span>' : ''}</div>
       </div>
-      <div class="word-slots">${slots.join('')}</div>
+      <div class="word-slots" style="--slot-count:${Math.max(2, displayLength)}">${slots.join('')}</div>
     </div>`;
   }).join('');
 }
-
 function renderKana() {
   if (!roomState) return;
   const me = roomState.players.find(p => p.id === roomState.meId);
@@ -387,14 +409,15 @@ function renderStatus() {
   const me = roomState.players.find(p => p.id === roomState.meId);
   const myTurn = roomState.currentId === roomState.meId && me?.alive;
   $('#gameTheme').textContent = roomState.theme;
+  $('#gameMinLength').textContent = `${roomState.minLength || 2}文字`;
+  $('#gameMaxLength').textContent = `${roomState.maxLength || 10}文字`;
   $('#turnLine').textContent = current ? `${current.name} のターン` : '';
-  $('#attackCounter').textContent = `攻撃 ${roomState.attackNo} / 2`;
   if (!me?.alive) {
     $('#messageStrip').textContent = 'あなたは脱落しました';
     $('#messageStrip').className = 'message-strip miss';
   } else if (myTurn) {
-    $('#messageStrip').textContent = roomState.attackNo === 2 ? 'HIT！ もう1回攻撃できます' : '文字を選んで「アタック」';
-    $('#messageStrip').className = roomState.attackNo === 2 ? 'message-strip hit' : 'message-strip';
+    $('#messageStrip').textContent = '文字を選んで「アタック」';
+    $('#messageStrip').className = 'message-strip';
   } else {
     $('#messageStrip').textContent = `${current?.name || '相手'} の操作を待っています`;
     $('#messageStrip').className = 'message-strip';
@@ -438,29 +461,46 @@ function send(payload) {
   return true;
 }
 
-function saveConfig() {
-  if (!isHost()) return;
-  send({
+function syncConfig() {
+  if (!isHost()) return false;
+  const minLength = Number($('#minLength').value);
+  const maxLength = Number($('#maxLength').value);
+  if (minLength > maxLength) {
+    toast('最低文字数は最高文字数以下にしてください');
+    return false;
+  }
+  return send({
     type: 'setConfig',
     theme: $('#themeInput').value.trim() || '自由',
-    targetCount: Number($('#targetCount').value)
+    targetCount: Number($('#targetCount').value),
+    minLength,
+    maxLength
   });
 }
 
 function startWords() {
   if (!isHost()) return;
+  const minLength = Number($('#minLength').value);
+  const maxLength = Number($('#maxLength').value);
+  if (minLength > maxLength) {
+    toast('最低文字数は最高文字数以下にしてください');
+    return;
+  }
   send({
-    type: 'setConfig',
+    type: 'startWords',
     theme: $('#themeInput').value.trim() || '自由',
-    targetCount: Number($('#targetCount').value)
+    targetCount: Number($('#targetCount').value),
+    minLength,
+    maxLength
   });
-  send({ type: 'startWords' });
 }
 
 function submitWord() {
   const word = normalizeWord($('#wordInput').value);
-  if (word.length < 2 || word.length > 10) {
-    toast('2〜10文字で入力してください');
+  const minLength = roomState?.minLength || 2;
+  const maxLength = roomState?.maxLength || 10;
+  if (word.length < minLength || word.length > maxLength) {
+    toast(`${minLength}〜${maxLength}文字で入力してください`);
     return;
   }
   if (send({ type: 'submitWord', word })) {
@@ -500,7 +540,16 @@ function closeSocket(markIntentional = true) {
   socket = null;
 }
 
-$('#saveConfigBtn').addEventListener('click', saveConfig);
+$('#targetCount').addEventListener('change', syncConfig);
+$('#minLength').addEventListener('change', () => {
+  if (Number($('#minLength').value) > Number($('#maxLength').value)) $('#maxLength').value = $('#minLength').value;
+  syncConfig();
+});
+$('#maxLength').addEventListener('change', () => {
+  if (Number($('#maxLength').value) < Number($('#minLength').value)) $('#minLength').value = $('#maxLength').value;
+  syncConfig();
+});
+$('#themeInput').addEventListener('change', syncConfig);
 $('#startWordsBtn').addEventListener('click', startWords);
 $('#saveWordBtn').addEventListener('click', submitWord);
 $('#attackBtn').addEventListener('click', attackSelected);
@@ -524,7 +573,7 @@ $('#closeRuleBtn').addEventListener('click', () => {
   if (d.close) d.close(); else d.removeAttribute('open');
 });
 
-makeTargetOptions();
+makeNumberOptions();
 $('#playerNameInput').value = localStorage.getItem('aiue-player-name') || '';
 show('lobbyScreen');
 fetchRooms();

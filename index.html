@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#17110d">
-  <title>あいうえバトル Web v0.6</title>
+  <title>あいうえバトル Web v0.7</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand">あいうえバトル <span>Web v0.6</span></div>
+    <div class="brand">あいうえバトル <span>Web v0.7</span></div>
     <div class="room-chip" id="roomChip">ロビー</div>
     <div class="top-actions">
       <button class="small" id="ruleBtn">ルール</button>
@@ -30,7 +30,7 @@
             <input id="playerNameInput" maxlength="12" placeholder="名前を入力">
           </div>
           <p>遊ぶ部屋を選択してください</p>
-          <div class="version-badge">WEB VERSION 0.6 / ONLINE</div>
+          <div class="version-badge">WEB VERSION 0.7 / ONLINE</div>
           <div id="serverStatus" class="server-status">サーバー確認中…</div>
         </div>
         <div class="rooms-grid" id="roomsGrid"></div>
@@ -51,7 +51,10 @@
           <div class="online-config-panel">
             <div class="form-row"><label>お題</label><input id="themeInput" maxlength="24" value="食べ物"></div>
             <div class="form-row"><label>参加人数</label><select id="targetCount"></select></div>
-            <button id="saveConfigBtn" class="secondary big">設定を反映</button>
+            <div class="length-config-row">
+              <div class="form-row"><label>最低文字数</label><select id="minLength"></select></div>
+              <div class="form-row"><label>最高文字数</label><select id="maxLength"></select></div>
+            </div>
             <button id="startWordsBtn" class="primary big room-start-btn">ワード入力開始</button>
             <div id="roomGuide" class="room-guide">参加者を待っています。</div>
           </div>
@@ -70,7 +73,7 @@
         <div class="theme-pill">お題：<b id="wordTheme"></b></div>
         <div id="wordEntryArea">
           <p>ほかのプレイヤーには送信した言葉そのものは表示されません。</p>
-          <input id="wordInput" class="word-input" maxlength="20" autocomplete="off" placeholder="2〜10文字">
+          <input id="wordInput" class="word-input" maxlength="10" autocomplete="off" placeholder="2〜10文字">
           <div id="normalizedPreview" class="normalized-preview">変換後：—</div>
           <div class="hint">濁点・半濁点は外し、小さい「ゃゅょっ」は大きい文字として扱います。</div>
           <button class="primary big" id="saveWordBtn">この言葉で決定</button>
@@ -94,14 +97,13 @@
           <div class="status-card">
             <div class="theme-line">お題 <b id="gameTheme"></b></div>
             <div id="turnLine" class="turn-line">PLAYER のターン</div>
-            <div id="attackCounter" class="attack-counter">攻撃 1 / 2</div>
           </div>
 
           <div class="kana-shell">
             <div class="kana-limit-row">
-              <div class="kana-limit"><span>最低文字数</span><b>2文字</b></div>
+              <div class="kana-limit"><span>最低文字数</span><b id="gameMinLength">2文字</b></div>
               <div id="selectedKana" class="selected-kana" aria-live="polite">未選択</div>
-              <div class="kana-limit right"><span>最高文字数</span><b>10文字</b></div>
+              <div class="kana-limit right"><span>最高文字数</span><b id="gameMaxLength">10文字</b></div>
             </div>
             <div class="kana-stage">
               <div id="kanaBoard" class="kana-board" aria-label="50音盤"></div>
@@ -143,9 +145,9 @@
 
   <dialog id="ruleDialog">
     <h2>ルール</h2>
-    <p>お題に沿った2〜10文字の言葉を秘密に決めます。順番に50音盤から未使用の1文字を選びます。</p>
+    <p>お題に沿って、ロビーで設定された文字数の範囲で言葉を秘密に決めます。順番に50音盤から未使用の1文字を選びます。</p>
     <p>その文字を使っている全プレイヤーは該当位置を公開します。自分の言葉も対象です。</p>
-    <p>1回目の攻撃が当たった場合だけ、もう1回攻撃できます。2回目の攻撃後は結果に関係なく次の人へ移ります。</p>
+    <p>アタックは1ターンに1回です。HIT・MISSに関係なく次のプレイヤーへ移ります。</p>
     <p>言葉の文字がすべて公開された人は脱落。最後の1人が勝者です。</p>
     <button class="primary" id="closeRuleBtn">閉じる</button>
   </dialog>

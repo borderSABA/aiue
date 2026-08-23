@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#17110d">
-  <title>あいうえバトル Web v0.11</title>
-  <link rel="stylesheet" href="style.css?v=0.11">
+  <title>あいうえバトル Web v0.12</title>
+  <link rel="stylesheet" href="style.css?v=0.12">
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand">あいうえバトル <span>Web v0.11</span></div>
+    <div class="brand">あいうえバトル <span>Web v0.12</span></div>
     <div class="room-chip" id="roomChip">ロビー</div>
     <div class="top-actions">
       <button class="small hidden" id="logBtn">ログ</button>
@@ -31,7 +31,7 @@
             <input id="playerNameInput" maxlength="12" placeholder="名前を入力">
           </div>
           <p>遊ぶ部屋を選択してください</p>
-          <div class="version-badge">WEB VERSION 0.8 / ONLINE</div>
+          <div class="version-badge">WEB VERSION 0.12 / ONLINE</div>
           <div id="serverStatus" class="server-status">サーバー確認中…</div>
         </div>
         <div class="rooms-grid" id="roomsGrid"></div>
@@ -53,8 +53,8 @@
             <div class="form-row"><label>お題</label><input id="themeInput" maxlength="24" value="食べ物"></div>
             <div class="form-row"><label>参加人数</label><select id="targetCount"></select></div>
             <div class="length-config-row">
-              <div class="form-row"><label>最低文字数</label><select id="minLength"></select></div>
-              <div class="form-row"><label>最高文字数</label><select id="maxLength"></select></div>
+              <div class="form-row"><label>最低</label><select id="minLength"></select></div>
+              <div class="form-row"><label>最高</label><select id="maxLength"></select></div>
             </div>
             <div class="room-action-row">
               <button id="addCpuBtn" class="secondary big cpu-add-btn">CPU追加</button>
@@ -104,9 +104,9 @@
 
           <div class="kana-shell">
             <div class="kana-limit-row">
-              <div class="kana-limit"><span>最低文字数</span><b id="gameMinLength">2文字</b></div>
+              <div class="kana-limit"><span>最低</span><b id="gameMinLength">2文字</b></div>
               <div id="selectedKana" class="selected-kana" aria-live="polite">未選択</div>
-              <div class="kana-limit right"><span>最高文字数</span><b id="gameMaxLength">10文字</b></div>
+              <div class="kana-limit right"><span>最高</span><b id="gameMaxLength">10文字</b></div>
             </div>
             <div class="kana-stage">
               <div id="kanaBoard" class="kana-board" aria-label="50音盤"></div>
@@ -160,7 +160,7 @@
     <button class="primary" id="closeRuleBtn">閉じる</button>
   </dialog>
 </div>
-<script src="config.js?v=0.11"></script>
-<script src="app.js?v=0.11"></script>
+<script src="config.js?v=0.12"></script>
+<script src="app.js?v=0.12"></script>
 </body>
 </html>

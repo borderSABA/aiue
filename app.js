@@ -3,7 +3,7 @@
 
 const $ = s => document.querySelector(s);
 const screens = [...document.querySelectorAll('.screen')];
-const VERSION = '0.11';
+const VERSION = '0.12';
 const ROOM_COUNT = 4;
 const SERVER_URL = String(window.AIUE_SERVER_URL || '').replace(/\/$/, '');
 const kanaRows = [
@@ -381,10 +381,10 @@ function renderPlayers() {
       const hit = !!p.revealedMask?.[i];
       if (isMe && ch !== null) {
         // 自分の回答は常に見える。HITされた位置だけ赤背景にする。
-        slots.push(`<div class="slot revealed own${hit ? ' self-hit' : ''}">${escapeHtml(ch)}</div>`);
+        slots.push(`<div class="slot revealed own${hit ? ' hit-cell' : ''}">${escapeHtml(ch)}</div>`);
       } else if (!isMe && ch !== null) {
         // 相手はHITした本来の位置だけ公開する。
-        slots.push(`<div class="slot revealed">${escapeHtml(ch)}</div>`);
+        slots.push(`<div class="slot revealed hit-cell">${escapeHtml(ch)}</div>`);
       } else {
         // 最大文字数ぶん必ず「？」枠を残す。generic .hidden とは分離する。
         slots.push('<div class="slot concealed">?</div>');

@@ -344,3 +344,29 @@ button:disabled{cursor:default}
   .message-strip{min-height:24px!important;font-size:.58rem!important;border-radius:5px!important}
   .eliminated-tag{font-size:.35rem!important;padding:1px 2px!important;right:1px!important;top:1px!important}
 }
+
+
+/* v0.11: fixed maximum-length slot grid / own answer visible */
+.slot.concealed{
+  display:grid!important;
+  place-items:center!important;
+  visibility:visible!important;
+  background:#f8f8f8!important;
+  color:#252525!important;
+  border:1px solid #c9c9c9!important;
+  box-shadow:inset 0 -2px 0 #d6d6d6!important;
+  opacity:1!important;
+}
+.slot.concealed::after{content:none!important}
+.slot.own{
+  display:grid!important;
+  background:#f8f8f8!important;
+  color:#252525!important;
+}
+.slot.own.self-hit{
+  background:#ff2020!important;
+  color:#111!important;
+  border-color:#bd0b0b!important;
+  box-shadow:inset 0 -2px 0 #ba1111!important;
+  text-shadow:none!important;
+}

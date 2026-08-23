@@ -63,6 +63,7 @@ function escapeHtml(s) {
 
 function show(id) {
   screens.forEach(x => x.classList.toggle('active', x.id === id));
+  document.body.classList.toggle('game-active', id === 'gameScreen');
   const inRoom = selectedRoom !== null && id !== 'lobbyScreen';
   $('#roomChip').textContent = inRoom ? `ROOM ${selectedRoom}` : 'ロビー';
   $('#roomResetBtn').classList.toggle('hidden', !inRoom);
@@ -402,7 +403,7 @@ function renderPlayers() {
       <div class="player-head">
         <div class="player-name">${escapeHtml(p.name)}${p.isCpu ? '<span class="cpu-mark">CPU</span>' : ''}${isMe ? '<span class="you-mark">自分</span>' : ''}</div>
       </div>
-      <div class="word-slots" style="--slot-count:${maxLength}">${slots.join('')}</div>
+      <div class="word-slots${maxLength >= 6 ? ' mobile-two-row' : ''}" style="--slot-count:${maxLength};--mobile-cols:${Math.ceil(maxLength / 2)}">${slots.join('')}</div>
     </div>`;
   };
 

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#17110d">
+  <title>あいうえバトル Web v0.6</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand">あいうえバトル <span>Web v0.6</span></div>
+    <div class="room-chip" id="roomChip">ロビー</div>
+    <div class="top-actions">
+      <button class="small" id="ruleBtn">ルール</button>
+      <button class="small danger hidden" id="roomResetBtn">部屋を初期化</button>
+      <button class="small hidden" id="leaveRoomBtn">退出</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="lobbyScreen" class="screen active lobby-screen">
+      <div class="lobby-wrap">
+        <div class="lobby-hero">
+          <div class="logo-bubbles" aria-hidden="true"><i>あ</i><i>い</i><i>う</i><i>え</i></div>
+          <h1>あいうえ<br>バトル</h1>
+          <div class="online-name-row">
+            <label for="playerNameInput">プレイヤー名</label>
+            <input id="playerNameInput" maxlength="12" placeholder="名前を入力">
+          </div>
+          <p>遊ぶ部屋を選択してください</p>
+          <div class="version-badge">WEB VERSION 0.6 / ONLINE</div>
+          <div id="serverStatus" class="server-status">サーバー確認中…</div>
+        </div>
+        <div class="rooms-grid" id="roomsGrid"></div>
+      </div>
+    </section>
+
+    <section id="roomScreen" class="screen setup-screen">
+      <div class="setup-card wide room-online-card">
+        <div class="setup-heading">
+          <div>
+            <div class="eyebrow" id="roomLabel">ROOM 1</div>
+            <h2>対戦ロビー</h2>
+          </div>
+          <div id="hostBadge" class="local-note">参加者</div>
+        </div>
+
+        <div class="online-room-grid">
+          <div class="online-config-panel">
+            <div class="form-row"><label>お題</label><input id="themeInput" maxlength="24" value="食べ物"></div>
+            <div class="form-row"><label>参加人数</label><select id="targetCount"></select></div>
+            <button id="saveConfigBtn" class="secondary big">設定を反映</button>
+            <button id="startWordsBtn" class="primary big room-start-btn">ワード入力開始</button>
+            <div id="roomGuide" class="room-guide">参加者を待っています。</div>
+          </div>
+          <div>
+            <div class="names-title">参加プレイヤー</div>
+            <div id="roomPlayers" class="online-player-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="wordScreen" class="screen word-screen">
+      <div class="pass-card online-word-card">
+        <div class="eyebrow">秘密の言葉を入力</div>
+        <h2 id="wordPlayerName">PLAYER</h2>
+        <div class="theme-pill">お題：<b id="wordTheme"></b></div>
+        <div id="wordEntryArea">
+          <p>ほかのプレイヤーには送信した言葉そのものは表示されません。</p>
+          <input id="wordInput" class="word-input" maxlength="20" autocomplete="off" placeholder="2〜10文字">
+          <div id="normalizedPreview" class="normalized-preview">変換後：—</div>
+          <div class="hint">濁点・半濁点は外し、小さい「ゃゅょっ」は大きい文字として扱います。</div>
+          <button class="primary big" id="saveWordBtn">この言葉で決定</button>
+        </div>
+        <div id="wordWaitingArea" class="word-waiting hidden">
+          <div class="ready-mark">✓</div>
+          <h3>ワード入力済み</h3>
+          <p id="readyCounter">ほかのプレイヤーを待っています。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="screen game-screen">
+      <div class="game-layout">
+        <section class="players-panel">
+          <div class="section-title">PLAYERS</div>
+          <div id="players" class="players"></div>
+        </section>
+
+        <section class="center-panel">
+          <div class="status-card">
+            <div class="theme-line">お題 <b id="gameTheme"></b></div>
+            <div id="turnLine" class="turn-line">PLAYER のターン</div>
+            <div id="attackCounter" class="attack-counter">攻撃 1 / 2</div>
+          </div>
+
+          <div class="kana-shell">
+            <div class="kana-limit-row">
+              <div class="kana-limit"><span>最低文字数</span><b>2文字</b></div>
+              <div id="selectedKana" class="selected-kana" aria-live="polite">未選択</div>
+              <div class="kana-limit right"><span>最高文字数</span><b>10文字</b></div>
+            </div>
+            <div class="kana-stage">
+              <div id="kanaBoard" class="kana-board" aria-label="50音盤"></div>
+            </div>
+            <button id="attackBtn" class="attack-button" disabled>アタック</button>
+          </div>
+
+          <div class="message-strip" id="messageStrip">待機中</div>
+        </section>
+
+        <aside class="log-panel">
+          <div class="section-title">LOG</div>
+          <div id="log" class="log"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="resultScreen" class="screen result-screen">
+      <div class="result-card">
+        <div class="crown">♛</div>
+        <div class="eyebrow">WINNER</div>
+        <h2 id="winnerName"></h2>
+        <div id="answerList" class="answer-list"></div>
+        <button class="primary big hidden" id="againBtn">同じ部屋でもう一度</button>
+        <button class="secondary big" id="backLobbyBtn">ロビーへ戻る</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <div id="attackOverlay" class="attack-overlay" aria-hidden="true">
+    <div class="attack-box">
+      <div id="attackName" class="attack-name"></div>
+      <div class="attack-label">攻撃！</div>
+      <div id="attackKana" class="attack-kana"></div>
+      <div id="attackResult" class="attack-result"></div>
+    </div>
+  </div>
+
+  <dialog id="ruleDialog">
+    <h2>ルール</h2>
+    <p>お題に沿った2〜10文字の言葉を秘密に決めます。順番に50音盤から未使用の1文字を選びます。</p>
+    <p>その文字を使っている全プレイヤーは該当位置を公開します。自分の言葉も対象です。</p>
+    <p>1回目の攻撃が当たった場合だけ、もう1回攻撃できます。2回目の攻撃後は結果に関係なく次の人へ移ります。</p>
+    <p>言葉の文字がすべて公開された人は脱落。最後の1人が勝者です。</p>
+    <button class="primary" id="closeRuleBtn">閉じる</button>
+  </dialog>
+</div>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

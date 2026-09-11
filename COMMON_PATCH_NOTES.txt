@@ -1,0 +1,146 @@
+ゲーム名：あいうえバトル
+共通化バージョン：Web v0.14
+
+[ADAPTER]
+GAME_ID = aiue-battle
+GAME_NAME = あいうえバトル
+MAX_PLAYERS = 10
+WORKER_ORIGIN = https://aiue-online.naitoryo7110.workers.dev
+APP_VERSION = v0.14
+
+タイトル描画箇所 = 01_GitHub用/index.html / lobbyScreen / common-title-hero
+ROOM一覧描画箇所 = 01_GitHub用/app.js / renderRooms()
+ROOM参加処理 = 01_GitHub用/app.js / joinRoom(), checkRoomJoin(), openRoomSocket()
+ゲーム開始処理 = 02_Cloudflare_Workers用/src/worker.js / AiueRoom.startGame()
+再接続処理 = 01_GitHub用/app.js / getToken(), scheduleReconnect(), reconnectCurrentRoom()
+ROOM初期化処理 = 01_GitHub用/app.js / resetRoomFromLobby()
+Worker側ROOM処理 = 02_Cloudflare_Workers用/src/worker.js / AiueRoom
+Worker側保存処理 = 02_Cloudflare_Workers用/src/worker.js / save()
+参加者配列 = this.data.players
+CPU配列 = this.data.players の isCpu=true 要素
+ゲーム状態 = this.data.phase / used / currentIndex / turnToken / winnerId 等
+
+[CLIENT]
+ファイル：01_GitHub用/index.html
+変更内容：
+・バージョンを v0.14 へ更新
+・タイトル画面を「ゲームタイトル → プレイヤー名 → ROOM 1～4」の共通配置へ整理
+・HOME／プレイ記録ボタンは規格v4に従い表示しない
+・トップバーのROOM初期化ボタンを削除し、タイトルの各ROOM個別初期化に統一
+・既存ゲーム本編UIは維持
+
+ファイル：01_GitHub用/app.js
+変更関数：renderRooms()
+変更内容：
+・固定ROOM 1～4を表示
+・各ROOMに ROOM番号 / 現在人 数/10 / 参加者名 / 待機中・ゲーム中・終了 / 参加・再接続 / 個別初期化 を表示
+・PC 4列、スマホ 2列×2段の既存CSSを利用
+
+変更関数：commonSavedName(), saveCommonNameOnActualStart()
+変更内容：
+・共通名キー boardgamePlayerName を使用
+・名前入力中は sessionStorage のドラフトだけ更新
+・ROOM参加時には boardgamePlayerName を保存しない
+・サーバーから playing + gameSessionId を受信した時だけ共通名を保存
+
+変更関数：joinRoom(), checkRoomJoin(), openRoomSocket()
+変更内容：
+・WebSocket接続前に /join-check を実行
+・空ROOMだけホスト権限確認
+・既存ROOMはホスト権限なしでも参加可能
+・エラー文言は「ホスト権限がありません」「ホスト権限を確認できません。」へ統一
+
+変更関数：tokenKey(), getToken(), scheduleReconnect(), reconnectCurrentRoom()
+変更内容：
+・GAME_IDベースのROOM別再接続tokenを localStorage に保存
+・現在ROOM / 現在名を別キーで保持
+・ページ更新、通信切断、オンライン復帰、タブ復帰で再接続
+・ROOM初期化済みの古い再接続情報から空ROOMを自動再作成しない
+
+変更関数：newActionId(), syncConfig(), startWords(), addCpu(), CPU削除, restart
+変更内容：
+・共通化対象操作に actionId を付与
+
+変更関数：resetRoomFromLobby()
+変更内容：
+・/reset-empty?roomId=roomN を使用
+・確認表示あり
+・指定ROOMだけ初期化
+
+ファイル：01_GitHub用/style.css
+変更内容：
+・タイトル画面共通配置用の最小CSSを追加
+・ROOMカード内の参加者名表示を追加
+・ROOMの参加/初期化ボタンを縦配置
+・ゲーム本編UIの既存レイアウトは変更していない
+
+[WORKER]
+ファイル：02_Cloudflare_Workers用/src/worker.js
+変更箇所：共通定数 / checkHostPermission()
+変更内容：
+・COMMON_MANAGER_URL = https://boardgame-hub-api.naitoryo7110.workers.dev
+・GET /api/host/check?name=... を使用
+・空ROOM新規参加時のみ共通管理Workerでホスト確認
+・join-check後、WebSocket参加時にもサーバー側で再確認
+
+変更箇所：/join-check
+変更内容：
+・既存tokenまたは既存ROOMなら hostCheck=false で許可
+・空ROOMだけホスト確認
+
+変更箇所：/reset-empty / resetRoom()
+変更内容：
+・接続中の人間がいるROOMはタイトル画面から初期化拒否
+・完全初期化時に参加者 / CPU / hostId / ゲーム状態 / 記録状態 / processedActions / gameSessionId を初期化
+・ROOMごとにDurable Objectが分離されているため他ROOMには影響しない
+
+変更箇所：freshRoom(), createPlayRecordForStart(), writePlayRecord()
+変更内容：
+・recordEpoch / gameSequence / recordAttempt / gameSessionId / startedAt / playRecordStatus を追加
+・実際に phase=playing が成立した時だけ POST /api/play/start
+・recordId / gameSessionId で1ゲーム1件
+・通信結果 unknown の自動再送は行わない
+
+変更箇所：isDuplicateAction(), webSocketMessage()
+変更内容：
+・setConfig / addCpu / removeCpu / startWords / restart の二重送信を防止
+
+変更箇所：webSocketClose(), personalizedState(), publicStatus()
+変更内容：
+・切断時に参加者を即削除せず再接続可能に変更
+・同じROOM tokenで復帰
+・ROOM一覧へ参加者名と標準statusを返す
+・gameSessionIdを本人クライアントへ返し、共通名の開始時保存に使用
+・秘密ワードの既存非公開処理は維持
+
+ファイル：02_Cloudflare_Workers用/wrangler.toml
+変更内容：
+・COMMON_MANAGER_URL を vars に追加
+・既存Worker名 aiue-online / Durable Object設定 / Worker URLを維持
+
+ファイル：02_Cloudflare_Workers用/0_CHECK_SERVER.bat
+変更内容：
+・追加
+・ASCII / BOMなし / CRLF / npm・npxはcall / 成功失敗ともpause
+
+ファイル：02_Cloudflare_Workers用/1_DEPLOY_SERVER.bat
+変更内容：
+・ASCII / BOMなし / CRLF を再確認して標準化
+
+[TEST]
+・JavaScript構文確認：OK
+・Worker構文確認：OK
+・既存Worker URL維持：https://aiue-online.naitoryo7110.workers.dev
+・ROOM 1～4：OK
+・PC ROOM 4列：OK
+・スマホ ROOM 2列×2段：OK
+・空ROOM + 権限あり：Workerロジックテスト OK
+・空ROOM + 権限なし：「ホスト権限がありません」確認 OK
+・既存ROOM + 権限なし：Workerロジックテスト OK
+・ROOM個別初期化：接続中人間を拒否 / 無接続時成功を確認
+・他ROOMへ影響しない：ROOMごとに別Durable Objectを使用
+・ROOM参加だけで共通名保存なし：コード確認 OK
+・ゲーム開始時だけ共通名保存：playing + gameSessionId 条件を確認
+・ROOM参加だけでプレイ記録なし：writePlayRecord呼出箇所確認 OK
+・ゲーム開始時だけプレイ記録：startGame()内のみ、Workerロジックテスト OK
+・再接続：ROOM別token / ACTIVE_ROOM_KEY / visibilitychange / online を確認

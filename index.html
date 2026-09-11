@@ -4,18 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#17110d">
-  <title>あいうえバトル Web v0.13</title>
-  <link rel="stylesheet" href="style.css?v=0.12">
+  <title>あいうえバトル Web v0.14</title>
+  <link rel="stylesheet" href="style.css?v=0.14">
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand">あいうえバトル <span>Web v0.13</span></div>
+    <div class="brand">あいうえバトル <span>Web v0.14</span></div>
     <div class="room-chip" id="roomChip">ロビー</div>
     <div class="top-actions">
       <button class="small hidden" id="logBtn">ログ</button>
       <button class="small" id="ruleBtn">ルール</button>
-      <button class="small danger hidden" id="roomResetBtn">部屋を初期化</button>
       <button class="small hidden" id="leaveRoomBtn">退出</button>
     </div>
   </header>
@@ -23,15 +22,16 @@
   <main>
     <section id="lobbyScreen" class="screen active lobby-screen">
       <div class="lobby-wrap">
-        <div class="lobby-hero">
-          <div class="logo-bubbles" aria-hidden="true"><i>あ</i><i>い</i><i>う</i><i>え</i></div>
-          <h1>あいうえ<br>バトル</h1>
+        <div class="lobby-hero common-title-hero">
+          <div class="common-title-row">
+            <h1>あいうえバトル</h1>
+            <div class="version-badge">Web v0.14</div>
+          </div>
           <div class="online-name-row">
             <label for="playerNameInput">プレイヤー名</label>
-            <input id="playerNameInput" maxlength="12" placeholder="名前を入力">
+            <input id="playerNameInput" maxlength="32" placeholder="名前を入力">
           </div>
-          <p>遊ぶ部屋を選択してください</p>
-          <div class="version-badge">WEB VERSION 0.13 / ONLINE</div>
+          <p>遊ぶROOMを選択してください</p>
           <div id="serverStatus" class="server-status">サーバー確認中…</div>
         </div>
         <div class="rooms-grid" id="roomsGrid"></div>
@@ -160,7 +160,7 @@
     <button class="primary" id="closeRuleBtn">閉じる</button>
   </dialog>
 </div>
-<script src="config.js?v=0.12"></script>
-<script src="app.js?v=0.12"></script>
+<script src="config.js?v=0.14"></script>
+<script src="app.js?v=0.14"></script>
 </body>
 </html>

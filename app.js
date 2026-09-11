@@ -3,9 +3,23 @@
 
 const $ = s => document.querySelector(s);
 const screens = [...document.querySelectorAll('.screen')];
-const VERSION = '0.12';
-const ROOM_COUNT = 4;
-const SERVER_URL = String(window.AIUE_SERVER_URL || '').replace(/\/$/, '');
+
+const GAME_ID = 'aiue-battle';
+const GAME_NAME = 'あいうえバトル';
+const MAX_PLAYERS = 10;
+const WORKER_ORIGIN = String(
+  window.AIUE_SERVER_URL || 'https://aiue-online.naitoryo7110.workers.dev'
+).replace(/\/$/, '');
+const SERVER_URL = WORKER_ORIGIN;
+const COMMON_MANAGER_URL = 'https://boardgame-hub-api.naitoryo7110.workers.dev';
+const COMMON_PLAYER_NAME_KEY = 'boardgamePlayerName';
+const ROOM_IDS = ['room1', 'room2', 'room3', 'room4'];
+const APP_VERSION = 'v0.14';
+const VERSION = '0.14';
+const ROOM_COUNT = ROOM_IDS.length;
+const NAME_DRAFT_KEY = `${GAME_ID}-name-draft`;
+const ACTIVE_ROOM_KEY = `${GAME_ID}-online-room`;
+const ACTIVE_NAME_KEY = `${GAME_ID}-online-active-name`;
 const kanaRows = [
   ['あ','い','う','え','お'],
   ['か','き','く','け','こ'],
@@ -29,6 +43,7 @@ const allowed = new Set(kanaRows.flat().filter(Boolean));
 let selectedRoom = null;
 let socket = null;
 let roomState = null;
+let currentPlayerName = '';
 let selectedKana = '';
 let attackPending = false;
 let intentionalClose = false;
@@ -36,17 +51,90 @@ let lastAttackEvent = '';
 let toastTimer = null;
 let roomPollTimer = null;
 let cpuTurnTimer = null;
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+let commonNameSavedForSession = null;
+let actionSeq = 0;
 
-const clientId = getClientId();
+function commonSavedName() {
+  return String(
+    localStorage.getItem(COMMON_PLAYER_NAME_KEY) || ''
+  ).trim().slice(0, 32);
+}
 
-function getClientId() {
-  try {
-    if (window.name && window.name.startsWith('aiue-client:')) return window.name.slice(12);
-    const id = crypto.randomUUID ? crypto.randomUUID() : `c-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    window.name = `aiue-client:${id}`;
-    return id;
-  } catch {
-    return `c-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function saveCommonNameOnActualStart(playerName) {
+  const name = String(playerName || '').trim().slice(0, 32);
+  if (!name) return;
+  localStorage.setItem(COMMON_PLAYER_NAME_KEY, name);
+}
+
+function roomIdFromNo(roomNo) {
+  return ROOM_IDS[Number(roomNo) - 1] || null;
+}
+
+function roomNoFromId(roomId) {
+  const index = ROOM_IDS.indexOf(String(roomId || ''));
+  return index >= 0 ? index + 1 : null;
+}
+
+function tokenKey(roomId) {
+  return `${GAME_ID}-online-token-${roomId}`;
+}
+
+function getToken(roomId) {
+  let token = localStorage.getItem(tokenKey(roomId));
+  if (!token) {
+    token = crypto.randomUUID
+      ? crypto.randomUUID().replace(/-/g, '')
+      : `t${Date.now()}${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(tokenKey(roomId), token);
+  }
+  return token;
+}
+
+function newActionId(prefix = 'op') {
+  actionSeq = (actionSeq + 1) % 1000000;
+  return [
+    prefix,
+    Date.now(),
+    actionSeq,
+    Math.random().toString(36).slice(2, 8)
+  ].join('-');
+}
+
+function clearActiveRoom() {
+  localStorage.removeItem(ACTIVE_ROOM_KEY);
+  localStorage.removeItem(ACTIVE_NAME_KEY);
+}
+
+function rememberActiveRoom(roomId, playerName) {
+  if (!roomId || !playerName) return;
+  localStorage.setItem(ACTIVE_ROOM_KEY, roomId);
+  localStorage.setItem(ACTIVE_NAME_KEY, playerName);
+}
+
+function onRoomStateReceived(state) {
+  const roomId = roomIdFromNo(state.roomNo);
+  const meName = state.me?.name || currentPlayerName;
+  if (roomId && meName) {
+    currentPlayerName = meName;
+    rememberActiveRoom(roomId, meName);
+  }
+
+  const started =
+    state.status === 'playing'
+    || state.phase === 'playing'
+    || state.gameStarted === true;
+
+  const sessionId = state.gameSessionId || null;
+
+  if (
+    started
+    && sessionId
+    && commonNameSavedForSession !== sessionId
+  ) {
+    saveCommonNameOnActualStart(meName);
+    commonNameSavedForSession = sessionId;
   }
 }
 
@@ -66,7 +154,6 @@ function show(id) {
   document.body.classList.toggle('game-active', id === 'gameScreen');
   const inRoom = selectedRoom !== null && id !== 'lobbyScreen';
   $('#roomChip').textContent = inRoom ? `ROOM ${selectedRoom}` : 'ロビー';
-  $('#roomResetBtn').classList.toggle('hidden', !inRoom);
   $('#leaveRoomBtn').classList.toggle('hidden', !inRoom);
   $('#logBtn').classList.toggle('hidden', !(id === 'gameScreen' || id === 'resultScreen'));
 }
@@ -79,13 +166,14 @@ function toast(message, ms = 2600) {
   toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-function phaseLabel(phase, players) {
-  if (!players) return ['空き', 'empty'];
-  if (phase === 'lobby') return ['待機中', 'playing'];
-  if (phase === 'word') return ['ワード入力', 'playing'];
-  if (phase === 'playing') return ['対戦中', 'playing'];
-  if (phase === 'result') return ['結果', 'playing'];
-  return ['使用中', 'playing'];
+function roomStatusLabel(room) {
+  if (room.status === 'playing' || room.phase === 'playing') {
+    return ['ゲーム中', 'playing'];
+  }
+  if (room.status === 'finished' || room.phase === 'result') {
+    return ['終了', 'playing'];
+  }
+  return ['待機中', room.players ? 'playing' : 'empty'];
 }
 
 async function fetchRooms() {
@@ -111,34 +199,71 @@ function renderRooms(rooms) {
   const byNo = new Map(rooms.map(r => [Number(r.roomNo), r]));
   const root = $('#roomsGrid');
   root.innerHTML = '';
+
   for (let room = 1; room <= ROOM_COUNT; room++) {
-    const meta = byNo.get(room) || { roomNo: room, phase: 'lobby', players: 0, targetCount: 2, theme: '' };
-    const [label, cls] = phaseLabel(meta.phase, meta.players);
+    const roomId = roomIdFromNo(room);
+    const meta = byNo.get(room) || {
+      roomNo: room,
+      roomId,
+      status: 'lobby',
+      phase: 'lobby',
+      players: 0,
+      participantNames: []
+    };
+    const [label, cls] = roomStatusLabel(meta);
+    const names = Array.isArray(meta.participantNames)
+      ? meta.participantNames
+      : [];
+    const isReconnect =
+      localStorage.getItem(ACTIVE_ROOM_KEY) === roomId
+      && !!localStorage.getItem(tokenKey(roomId));
+
     const card = document.createElement('article');
     card.className = 'room-card' + (meta.players ? ' occupied' : '');
     card.innerHTML = `
-      <div class="room-card-top"><span class="room-no">ROOM ${room}</span><span class="room-status ${cls}">${label}</span></div>
-      <div class="room-people"><b>${meta.players || 0}</b><span>/ 10人</span></div>
-      <div class="room-theme">${meta.players ? `お題：${escapeHtml(meta.theme || '未設定')}` : '参加者を待っています'}</div>
+      <div class="room-card-top">
+        <span class="room-no">ROOM ${room}</span>
+        <span class="room-status ${cls}">${label}</span>
+      </div>
+      <div class="room-people"><b>${meta.players || 0}</b><span>/ ${MAX_PLAYERS}人</span></div>
+      <div class="room-players-summary">参加者：${names.length ? names.map(escapeHtml).join('、') : 'なし'}</div>
       <div class="room-actions">
-        <button class="primary enter-room" data-room="${room}">${meta.players ? 'この部屋を開く' : '入室'}</button>
-        <button class="room-init" data-init="${room}" ${meta.players ? '' : 'disabled'}>初期化</button>
+        <button class="primary enter-room" data-room="${room}">${isReconnect ? '再接続' : '参加する'}</button>
+        <button class="room-init" data-init="${room}">初期化</button>
       </div>`;
     root.append(card);
   }
-  root.querySelectorAll('.enter-room').forEach(btn => btn.addEventListener('click', () => joinRoom(Number(btn.dataset.room))));
-  root.querySelectorAll('.room-init').forEach(btn => btn.addEventListener('click', () => resetRoomFromLobby(Number(btn.dataset.init))));
+
+  root.querySelectorAll('.enter-room').forEach(btn => {
+    btn.addEventListener('click', () => joinRoom(Number(btn.dataset.room)));
+  });
+  root.querySelectorAll('.room-init').forEach(btn => {
+    btn.addEventListener('click', () => resetRoomFromLobby(Number(btn.dataset.init)));
+  });
 }
 
 async function resetRoomFromLobby(room) {
-  if (!confirm(`ROOM ${room} を初期化しますか？`)) return;
+  const roomId = roomIdFromNo(room);
+  if (!roomId) return;
+  const ok = confirm(`ROOM ${room} を初期化しますか？`);
+  if (!ok) return;
+
   try {
-    const res = await fetch(`${SERVER_URL}/room/${room}/reset?room=${room}`, { method: 'POST' });
-    if (!res.ok) throw new Error();
+    const url = new URL(`${WORKER_ORIGIN}/reset-empty`);
+    url.searchParams.set('roomId', roomId);
+    url.searchParams.set('actionId', newActionId('reset'));
+    const response = await fetch(url, {
+      method: 'POST',
+      cache: 'no-store'
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'ROOMを初期化できませんでした。');
+    }
     toast(`ROOM ${room} を初期化しました`);
     await fetchRooms();
-  } catch {
-    toast('部屋の初期化に失敗しました');
+  } catch (error) {
+    toast(error.message || 'ROOMを初期化できませんでした。');
   }
 }
 
@@ -164,21 +289,32 @@ function makeNumberOptions() {
 }
 
 function getPlayerName() {
-  const input = $('#playerNameInput');
-  const name = input.value.trim().slice(0, 12);
-  if (name) localStorage.setItem('aiue-player-name', name);
-  return name;
+  return $('#playerNameInput').value.trim().slice(0, 32);
 }
 
-function joinRoom(room) {
-  const name = getPlayerName();
-  if (!name) {
-    toast('プレイヤー名を入力してください');
-    $('#playerNameInput').focus();
-    return;
+async function checkRoomJoin(roomId, playerName, token) {
+  const url = new URL(`${WORKER_ORIGIN}/join-check`);
+  url.searchParams.set('roomId', roomId);
+  url.searchParams.set('name', playerName);
+  url.searchParams.set('token', token);
+
+  const response = await fetch(url, { cache: 'no-store' });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || 'ROOMへ参加できません。');
   }
-  closeSocket(false);
+
+  return data;
+}
+
+function openRoomSocket(room, name, token) {
+  closeSocket(true);
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+
   selectedRoom = room;
+  currentPlayerName = name;
   roomState = null;
   selectedKana = '';
   attackPending = false;
@@ -187,38 +323,166 @@ function joinRoom(room) {
   show('roomScreen');
   $('#roomGuide').textContent = '接続中…';
 
-  const wsBase = SERVER_URL.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:');
-  const url = `${wsBase}/room/${room}/ws?room=${room}&clientId=${encodeURIComponent(clientId)}&name=${encodeURIComponent(name)}`;
-  socket = new WebSocket(url);
+  const wsBase = WORKER_ORIGIN
+    .replace(/^http:/, 'ws:')
+    .replace(/^https:/, 'wss:');
+  const url = new URL(`${wsBase}/room/${room}/ws`);
+  url.searchParams.set('room', String(room));
+  url.searchParams.set('token', token);
+  url.searchParams.set('name', name);
 
-  socket.addEventListener('open', () => {
+  const ws = new WebSocket(url);
+  socket = ws;
+
+  ws.addEventListener('open', () => {
+    if (socket !== ws) return;
+    reconnectAttempts = 0;
     $('#serverStatus').textContent = 'オンライン接続中';
+    $('#serverStatus').classList.add('ok');
   });
-  socket.addEventListener('message', e => {
+
+  ws.addEventListener('message', e => {
+    if (socket !== ws) return;
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
     handleServerMessage(msg);
   });
-  socket.addEventListener('close', () => {
+
+  ws.addEventListener('close', () => {
+    if (socket !== ws) return;
     socket = null;
     if (intentionalClose) return;
     if (selectedRoom !== null) {
-      toast('接続が切れました。ロビーへ戻ります');
-      selectedRoom = null;
-      roomState = null;
-      show('lobbyScreen');
-      fetchRooms();
+      $('#serverStatus').textContent = '再接続中…';
+      $('#serverStatus').classList.remove('ok');
+      scheduleReconnect();
     }
   });
-  socket.addEventListener('error', () => {
-    toast('部屋へ接続できませんでした');
+
+  ws.addEventListener('error', () => {
+    if (socket !== ws) return;
+    if (!intentionalClose) {
+      $('#serverStatus').textContent = '再接続中…';
+      $('#serverStatus').classList.remove('ok');
+    }
   });
+}
+
+async function joinRoom(room, options = {}) {
+  const roomId = roomIdFromNo(room);
+  if (!roomId) return;
+
+  const name = String(
+    options.name ?? getPlayerName()
+  ).trim().slice(0, 32);
+
+  if (!name) {
+    toast('プレイヤー名を入力してください');
+    $('#playerNameInput').focus();
+    return;
+  }
+
+  const token = getToken(roomId);
+
+  try {
+    const check = await checkRoomJoin(
+      roomId,
+      name,
+      token
+    );
+
+    if (options.reconnect && check.hostCheck === true) {
+      clearActiveRoom();
+      selectedRoom = null;
+      roomState = null;
+      currentPlayerName = '';
+      show('lobbyScreen');
+      await fetchRooms();
+      return;
+    }
+  } catch (error) {
+    if (options.reconnect) {
+      clearActiveRoom();
+      selectedRoom = null;
+      roomState = null;
+      currentPlayerName = '';
+      show('lobbyScreen');
+      await fetchRooms();
+    }
+    toast(error.message || 'ROOMへ参加できません。');
+    return;
+  }
+
+  $('#playerNameInput').value = name;
+  sessionStorage.setItem(NAME_DRAFT_KEY, name);
+  openRoomSocket(room, name, token);
+}
+
+function scheduleReconnect() {
+  if (intentionalClose || selectedRoom === null) return;
+  clearTimeout(reconnectTimer);
+  const delay = Math.min(5000, 700 + reconnectAttempts * 700);
+  reconnectAttempts += 1;
+  reconnectTimer = setTimeout(() => {
+    reconnectCurrentRoom();
+  }, delay);
+}
+
+async function reconnectCurrentRoom() {
+  if (intentionalClose || selectedRoom === null) return;
+  if (socket && (
+    socket.readyState === WebSocket.OPEN
+    || socket.readyState === WebSocket.CONNECTING
+  )) {
+    return;
+  }
+
+  const roomId = roomIdFromNo(selectedRoom);
+  const name =
+    currentPlayerName
+    || localStorage.getItem(ACTIVE_NAME_KEY)
+    || getPlayerName();
+
+  if (!roomId || !name) {
+    clearActiveRoom();
+    selectedRoom = null;
+    show('lobbyScreen');
+    return;
+  }
+
+  const token = getToken(roomId);
+  try {
+    const check = await checkRoomJoin(
+      roomId,
+      name,
+      token
+    );
+    if (check.hostCheck === true) {
+      clearActiveRoom();
+      selectedRoom = null;
+      roomState = null;
+      currentPlayerName = '';
+      show('lobbyScreen');
+      fetchRooms();
+      return;
+    }
+    openRoomSocket(selectedRoom, name, token);
+  } catch (error) {
+    clearActiveRoom();
+    selectedRoom = null;
+    roomState = null;
+    currentPlayerName = '';
+    show('lobbyScreen');
+    toast(error.message || '再接続できませんでした。');
+    fetchRooms();
+  }
 }
 
 function handleServerMessage(msg) {
   if (msg.type === 'state') {
     roomState = msg;
     attackPending = false;
+    onRoomStateReceived(msg);
     routeFromState();
     return;
   }
@@ -241,6 +505,8 @@ function handleServerMessage(msg) {
     socket = null;
     selectedRoom = null;
     roomState = null;
+    currentPlayerName = '';
+    clearActiveRoom();
     show('lobbyScreen');
     fetchRooms();
   }
@@ -307,7 +573,7 @@ function renderRoomScreen() {
       </div>
     </div>`).join('');
   $('#roomPlayers').querySelectorAll('.cpu-remove').forEach(btn => {
-    btn.addEventListener('click', () => send({ type: 'removeCpu', cpuId: btn.dataset.cpuId }));
+    btn.addEventListener('click', () => send({ type: 'removeCpu', cpuId: btn.dataset.cpuId, actionId: newActionId('cpu-remove') }));
   });
 }
 
@@ -504,7 +770,7 @@ function scheduleCpuTurnIfNeeded() {
 
 function addCpu() {
   if (!isHost()) return;
-  send({ type: 'addCpu' });
+  send({ type: 'addCpu', actionId: newActionId('cpu-add') });
 }
 
 function send(payload) {
@@ -526,6 +792,7 @@ function syncConfig() {
   }
   return send({
     type: 'setConfig',
+    actionId: newActionId('config'),
     theme: $('#themeInput').value.trim() || '自由',
     targetCount: Number($('#targetCount').value),
     minLength,
@@ -543,6 +810,7 @@ function startWords() {
   }
   send({
     type: 'startWords',
+    actionId: newActionId('start'),
     theme: $('#themeInput').value.trim() || '自由',
     targetCount: Number($('#targetCount').value),
     minLength,
@@ -564,28 +832,27 @@ function submitWord() {
   }
 }
 
-async function resetCurrentRoom() {
-  if (selectedRoom === null) return;
-  if (!confirm(`ROOM ${selectedRoom} を初期化しますか？`)) return;
-  try {
-    const res = await fetch(`${SERVER_URL}/room/${selectedRoom}/reset?room=${selectedRoom}`, { method: 'POST' });
-    if (!res.ok) throw new Error();
-  } catch {
-    toast('部屋の初期化に失敗しました');
-  }
-}
-
 function leaveRoom() {
   clearTimeout(cpuTurnTimer);
+  clearTimeout(reconnectTimer);
   cpuTurnTimer = null;
-  if (socket?.readyState === WebSocket.OPEN) send({ type: 'leave' });
+  reconnectTimer = null;
+
+  if (socket?.readyState === WebSocket.OPEN) {
+    send({ type: 'leave' });
+  }
+
   intentionalClose = true;
   try { socket?.close(1000, 'left'); } catch {}
   socket = null;
   selectedRoom = null;
   roomState = null;
+  currentPlayerName = '';
   selectedKana = '';
   attackPending = false;
+  reconnectAttempts = 0;
+  commonNameSavedForSession = null;
+  clearActiveRoom();
   show('lobbyScreen');
   fetchRooms();
 }
@@ -595,8 +862,9 @@ function closeSocket(markIntentional = true) {
   cpuTurnTimer = null;
   if (!socket) return;
   if (markIntentional) intentionalClose = true;
-  try { socket.close(); } catch {}
+  const closingSocket = socket;
   socket = null;
+  try { closingSocket.close(); } catch {}
 }
 
 $('#targetCount').addEventListener('change', syncConfig);
@@ -620,9 +888,8 @@ $('#wordInput').addEventListener('input', e => {
 $('#wordInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); submitWord(); }
 });
-$('#roomResetBtn').addEventListener('click', resetCurrentRoom);
 $('#leaveRoomBtn').addEventListener('click', leaveRoom);
-$('#againBtn').addEventListener('click', () => send({ type: 'restart' }));
+$('#againBtn').addEventListener('click', () => send({ type: 'restart', actionId: newActionId('restart') }));
 $('#backLobbyBtn').addEventListener('click', leaveRoom);
 $('#logBtn').addEventListener('click', () => {
   renderLog();
@@ -643,14 +910,62 @@ $('#closeRuleBtn').addEventListener('click', () => {
 });
 
 makeNumberOptions();
-$('#playerNameInput').value = localStorage.getItem('aiue-player-name') || '';
+
+const initialName =
+  sessionStorage.getItem(NAME_DRAFT_KEY)
+  ?? commonSavedName()
+  ?? '';
+$('#playerNameInput').value = initialName;
+$('#playerNameInput').addEventListener('input', event => {
+  sessionStorage.setItem(NAME_DRAFT_KEY, event.target.value);
+});
+
 show('lobbyScreen');
 fetchRooms();
+
+const savedRoomId = localStorage.getItem(ACTIVE_ROOM_KEY);
+const savedActiveName = localStorage.getItem(ACTIVE_NAME_KEY);
+const savedRoomNo = roomNoFromId(savedRoomId);
+
+if (
+  savedRoomNo
+  && savedActiveName
+  && localStorage.getItem(tokenKey(savedRoomId))
+) {
+  currentPlayerName = savedActiveName;
+  $('#playerNameInput').value = savedActiveName;
+  joinRoom(savedRoomNo, {
+    reconnect: true,
+    name: savedActiveName
+  });
+}
+
 roomPollTimer = setInterval(() => {
   if (selectedRoom === null) fetchRooms();
 }, 3000);
+
+document.addEventListener('visibilitychange', () => {
+  if (
+    document.visibilityState === 'visible'
+    && selectedRoom !== null
+    && (!socket || socket.readyState !== WebSocket.OPEN)
+  ) {
+    scheduleReconnect();
+  }
+});
+
+window.addEventListener('online', () => {
+  if (
+    selectedRoom !== null
+    && (!socket || socket.readyState !== WebSocket.OPEN)
+  ) {
+    scheduleReconnect();
+  }
+});
+
 window.addEventListener('beforeunload', () => {
   clearTimeout(cpuTurnTimer);
+  clearTimeout(reconnectTimer);
   try { socket?.close(); } catch {}
 });
 })();

@@ -1,12 +1,12 @@
 ゲーム名：あいうえバトル
-共通化バージョン：Web v0.15
+共通化バージョン：Web v0.16
 
 [ADAPTER]
 GAME_ID = aiue-battle
 GAME_NAME = あいうえバトル
 MAX_PLAYERS = 10
 WORKER_ORIGIN = https://aiue-online.naitoryo7110.workers.dev
-APP_VERSION = v0.15
+APP_VERSION = v0.16
 
 タイトル描画箇所 = 01_GitHub用/index.html / lobbyScreen / common-title-hero
 ROOM一覧描画箇所 = 01_GitHub用/app.js / renderRooms()
@@ -167,3 +167,27 @@ src/worker.js
 ・v0.15 15文字枠：personalizedStateで15枠確認 OK
 ・v0.15 時間切れ：期限到達後のみパス、期限前は拒否をWorkerロジックテスト OK
 ・v0.15 PC 11〜15文字=2行 / スマホ11〜15文字=3行：CSS/描画クラス確認 OK
+
+
+[v0.16 追加変更]
+[CLIENT]
+style.css
+・PCゲーム画面を100dvh基準で固定し、上下スクロール/はみ出しを防止
+・PCの11〜15文字2段表示時に文字枠高さ、プレイヤー枠余白、中央盤面余白を縮小
+・1920×1080基準で10人表示＋中央50音盤が縦方向へ収まるよう調整
+
+[WORKER]
+src/worker.js
+・時間切れ処理をクライアント通知依存だけにせずDurable Object Alarmでもサーバー側判定
+・手番開始ごとに人間プレイヤーの制限時間終了時刻へAlarmを設定
+・0秒到達後はサーバー側でhandleTimeoutPass()を実行し次手番へ進行
+・クライアントのtimeoutPassは従来どおり補助経路として維持
+・全人間切断時の30分自動初期化とターンAlarmが競合しないようautoResetAtを追加
+
+[TEST v0.16]
+・JavaScript構文確認：OK
+・Worker構文確認：OK
+・既存Worker URL維持：https://aiue-online.naitoryo7110.workers.dev
+・PCゲーム画面：100dvh固定 / プレイヤー枠overflow hidden / 15文字2段の固定高さCSS確認
+・時間制限：startGame / attack / timeout pass / reconnectでAlarm再設定コード確認
+・0秒到達：Alarm側からhandleTimeoutPass()へ進むことをコード確認

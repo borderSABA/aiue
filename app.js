@@ -14,8 +14,8 @@ const SERVER_URL = WORKER_ORIGIN;
 const COMMON_MANAGER_URL = 'https://boardgame-hub-api.naitoryo7110.workers.dev';
 const COMMON_PLAYER_NAME_KEY = 'boardgamePlayerName';
 const ROOM_IDS = ['room1', 'room2', 'room3', 'room4'];
-const APP_VERSION = 'v0.15';
-const VERSION = '0.15';
+const APP_VERSION = 'v0.16';
+const VERSION = '0.16';
 const ROOM_COUNT = ROOM_IDS.length;
 const NAME_DRAFT_KEY = `${GAME_ID}-name-draft`;
 const ACTIVE_ROOM_KEY = `${GAME_ID}-online-room`;
@@ -53,6 +53,7 @@ let roomPollTimer = null;
 let cpuTurnTimer = null;
 let turnTimerInterval = null;
 let timeoutSentForToken = '';
+let timeoutLastSentAt = 0;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let commonNameSavedForSession = null;
@@ -799,9 +800,22 @@ function updateTurnTimer() {
     const remainingSec = Math.ceil(remainingMs / 1000);
     value.textContent = String(remainingSec);
     wrap.classList.toggle('danger', remainingSec <= 5);
-    if (remainingMs <= 0 && timeoutSentForToken !== token) {
-      timeoutSentForToken = token;
-      send({ type: 'timeoutPass', turnToken: token, actionId: newActionId('timeout-pass') });
+    if (remainingMs <= 0) {
+      const now = Date.now();
+      const shouldSend =
+        timeoutSentForToken !== token
+        || now - timeoutLastSentAt >= 1000;
+      if (shouldSend) {
+        const sent = send({
+          type: 'timeoutPass',
+          turnToken: token,
+          actionId: newActionId('timeout-pass')
+        });
+        if (sent) {
+          timeoutSentForToken = token;
+          timeoutLastSentAt = now;
+        }
+      }
     }
   };
   clearTurnTimer();

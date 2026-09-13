@@ -14,8 +14,8 @@ const SERVER_URL = WORKER_ORIGIN;
 const COMMON_MANAGER_URL = 'https://boardgame-hub-api.naitoryo7110.workers.dev';
 const COMMON_PLAYER_NAME_KEY = 'boardgamePlayerName';
 const ROOM_IDS = ['room1', 'room2', 'room3', 'room4'];
-const APP_VERSION = 'v0.14';
-const VERSION = '0.14';
+const APP_VERSION = 'v0.15';
+const VERSION = '0.15';
 const ROOM_COUNT = ROOM_IDS.length;
 const NAME_DRAFT_KEY = `${GAME_ID}-name-draft`;
 const ACTIVE_ROOM_KEY = `${GAME_ID}-online-room`;
@@ -51,6 +51,8 @@ let lastAttackEvent = '';
 let toastTimer = null;
 let roomPollTimer = null;
 let cpuTurnTimer = null;
+let turnTimerInterval = null;
+let timeoutSentForToken = '';
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let commonNameSavedForSession = null;
@@ -142,7 +144,7 @@ function normalizeWord(raw) {
   let s = String(raw || '').trim().replace(/\s+/g, '').normalize('NFKC');
   s = s.replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
   s = [...s].map(ch => voicedMap[ch] || ch).filter(ch => allowed.has(ch)).join('');
-  return s.slice(0, 10);
+  return s.slice(0, 15);
 }
 
 function escapeHtml(s) {
@@ -279,7 +281,7 @@ function makeNumberOptions() {
   for (const id of ['minLength', 'maxLength']) {
     const select = $('#' + id);
     select.innerHTML = '';
-    for (let n = 2; n <= 10; n++) {
+    for (let n = 2; n <= 15; n++) {
       const opt = document.createElement('option');
       opt.value = String(n);
       opt.textContent = `${n}文字`;
@@ -492,6 +494,10 @@ function handleServerMessage(msg) {
     showAttack(msg.attackerName, msg.kana, msg.hit);
     return;
   }
+  if (msg.type === 'passEvent') {
+    toast(`${msg.playerName || 'プレイヤー'}：時間切れでパス`, 2200);
+    return;
+  }
   if (msg.type === 'error') {
     attackPending = false;
     toast(msg.message || '操作できません');
@@ -547,10 +553,14 @@ function renderRoomScreen() {
   $('#targetCount').value = String(roomState.targetCount || 2);
   $('#minLength').value = String(roomState.minLength || 2);
   $('#maxLength').value = String(roomState.maxLength || 10);
+  $('#timeLimitEnabled').checked = !!roomState.timeLimitEnabled;
+  $('#timeLimitSeconds').value = String(roomState.timeLimitSeconds || 30);
   $('#themeInput').disabled = !host;
   $('#targetCount').disabled = !host;
   $('#minLength').disabled = !host;
   $('#maxLength').disabled = !host;
+  $('#timeLimitEnabled').disabled = !host;
+  $('#timeLimitSeconds').disabled = !host || !roomState.timeLimitEnabled;
   $('#startWordsBtn').classList.toggle('hidden', !host);
   $('#addCpuBtn').classList.toggle('hidden', !host);
 
@@ -669,7 +679,7 @@ function renderPlayers() {
       <div class="player-head">
         <div class="player-name">${escapeHtml(p.name)}${p.isCpu ? '<span class="cpu-mark">CPU</span>' : ''}${isMe ? '<span class="you-mark">自分</span>' : ''}</div>
       </div>
-      <div class="word-slots${maxLength >= 6 ? ' mobile-two-row' : ''}" style="--slot-count:${maxLength};--mobile-cols:${Math.ceil(maxLength / 2)}">${slots.join('')}</div>
+      <div class="word-slots${maxLength >= 11 ? ' pc-two-row mobile-three-row' : (maxLength >= 6 ? ' mobile-two-row' : '')}" style="--slot-count:${maxLength};--pc-cols:${Math.ceil(maxLength / 2)};--mobile-cols:${maxLength >= 11 ? Math.ceil(maxLength / 3) : Math.ceil(maxLength / 2)}">${slots.join('')}</div>
     </div>`;
   };
 
@@ -712,6 +722,7 @@ function renderStatus() {
   $('#gameMinLength').textContent = `${roomState.minLength || 2}文字`;
   $('#gameMaxLength').textContent = `${roomState.maxLength || 10}文字`;
   $('#turnLine').textContent = current ? `${current.name} のターン` : '';
+  updateTurnTimer();
   if (!me?.alive) {
     $('#messageStrip').textContent = 'あなたは脱落しました';
     $('#messageStrip').className = 'message-strip miss';
@@ -755,6 +766,49 @@ function showAttack(name, kana, hit) {
   setTimeout(() => overlay.classList.remove('show'), 1550);
 }
 
+function clearTurnTimer() {
+  clearInterval(turnTimerInterval);
+  turnTimerInterval = null;
+}
+
+function updateTurnTimer() {
+  const wrap = $('#turnTimer');
+  const value = $('#turnTimerValue');
+  if (!wrap || !value || !roomState || roomState.phase !== 'playing' || !roomState.timeLimitEnabled) {
+    if (wrap) wrap.classList.add('hidden');
+    clearTurnTimer();
+    return;
+  }
+
+  const current = roomState.players.find(p => p.id === roomState.currentId);
+  if (!current || current.isCpu || !roomState.turnToken || !roomState.turnStartedAt) {
+    wrap.classList.add('hidden');
+    clearTurnTimer();
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  const token = roomState.turnToken;
+  const tick = () => {
+    if (!roomState || roomState.phase !== 'playing' || roomState.turnToken !== token) {
+      clearTurnTimer();
+      return;
+    }
+    const endAt = Number(roomState.turnStartedAt) + Number(roomState.timeLimitSeconds || 30) * 1000;
+    const remainingMs = Math.max(0, endAt - Date.now());
+    const remainingSec = Math.ceil(remainingMs / 1000);
+    value.textContent = String(remainingSec);
+    wrap.classList.toggle('danger', remainingSec <= 5);
+    if (remainingMs <= 0 && timeoutSentForToken !== token) {
+      timeoutSentForToken = token;
+      send({ type: 'timeoutPass', turnToken: token, actionId: newActionId('timeout-pass') });
+    }
+  };
+  clearTurnTimer();
+  tick();
+  turnTimerInterval = setInterval(tick, 250);
+}
+
 function scheduleCpuTurnIfNeeded() {
   clearTimeout(cpuTurnTimer);
   cpuTurnTimer = null;
@@ -796,7 +850,9 @@ function syncConfig() {
     theme: $('#themeInput').value.trim() || '自由',
     targetCount: Number($('#targetCount').value),
     minLength,
-    maxLength
+    maxLength,
+    timeLimitEnabled: $('#timeLimitEnabled').checked,
+    timeLimitSeconds: Math.max(1, Math.min(3600, Number($('#timeLimitSeconds').value) || 30))
   });
 }
 
@@ -814,7 +870,9 @@ function startWords() {
     theme: $('#themeInput').value.trim() || '自由',
     targetCount: Number($('#targetCount').value),
     minLength,
-    maxLength
+    maxLength,
+    timeLimitEnabled: $('#timeLimitEnabled').checked,
+    timeLimitSeconds: Math.max(1, Math.min(3600, Number($('#timeLimitSeconds').value) || 30))
   });
 }
 
@@ -834,6 +892,7 @@ function submitWord() {
 
 function leaveRoom() {
   clearTimeout(cpuTurnTimer);
+  clearTurnTimer();
   clearTimeout(reconnectTimer);
   cpuTurnTimer = null;
   reconnectTimer = null;
@@ -859,6 +918,7 @@ function leaveRoom() {
 
 function closeSocket(markIntentional = true) {
   clearTimeout(cpuTurnTimer);
+  clearTurnTimer();
   cpuTurnTimer = null;
   if (!socket) return;
   if (markIntentional) intentionalClose = true;
@@ -874,6 +934,15 @@ $('#minLength').addEventListener('change', () => {
 });
 $('#maxLength').addEventListener('change', () => {
   if (Number($('#maxLength').value) < Number($('#minLength').value)) $('#minLength').value = $('#maxLength').value;
+  syncConfig();
+});
+$('#timeLimitEnabled').addEventListener('change', () => {
+  $('#timeLimitSeconds').disabled = !isHost() || !$('#timeLimitEnabled').checked;
+  syncConfig();
+});
+$('#timeLimitSeconds').addEventListener('change', () => {
+  const el = $('#timeLimitSeconds');
+  el.value = String(Math.max(1, Math.min(3600, Number(el.value) || 30)));
   syncConfig();
 });
 $('#themeInput').addEventListener('change', syncConfig);

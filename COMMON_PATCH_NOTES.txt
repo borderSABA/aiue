@@ -1,12 +1,12 @@
 ゲーム名：あいうえバトル
-共通化バージョン：Web v0.14
+共通化バージョン：Web v0.15
 
 [ADAPTER]
 GAME_ID = aiue-battle
 GAME_NAME = あいうえバトル
 MAX_PLAYERS = 10
 WORKER_ORIGIN = https://aiue-online.naitoryo7110.workers.dev
-APP_VERSION = v0.14
+APP_VERSION = v0.15
 
 タイトル描画箇所 = 01_GitHub用/index.html / lobbyScreen / common-title-hero
 ROOM一覧描画箇所 = 01_GitHub用/app.js / renderRooms()
@@ -23,7 +23,7 @@ CPU配列 = this.data.players の isCpu=true 要素
 [CLIENT]
 ファイル：01_GitHub用/index.html
 変更内容：
-・バージョンを v0.14 へ更新
+・バージョンを v0.15 へ更新
 ・タイトル画面を「ゲームタイトル → プレイヤー名 → ROOM 1～4」の共通配置へ整理
 ・HOME／プレイ記録ボタンは規格v4に従い表示しない
 ・トップバーのROOM初期化ボタンを削除し、タイトルの各ROOM個別初期化に統一
@@ -144,3 +144,26 @@ CPU配列 = this.data.players の isCpu=true 要素
 ・ROOM参加だけでプレイ記録なし：writePlayRecord呼出箇所確認 OK
 ・ゲーム開始時だけプレイ記録：startGame()内のみ、Workerロジックテスト OK
 ・再接続：ROOM別token / ACTIVE_ROOM_KEY / visibilitychange / online を確認
+
+[v0.15 追加変更]
+[CLIENT]
+index.html / app.js / style.css
+・最大文字数を15文字まで選択可能に拡張
+・PCは11〜15文字時に文字枠を2行表示
+・スマホは11〜15文字時に文字枠を3行表示（スクロールなし維持）
+・時間制限ON/OFF、秒数入力をロビー設定へ追加
+・ゲーム中に残り時間を表示し、時間切れ時にtimeoutPassを送信
+
+[WORKER]
+src/worker.js
+・最大15文字に対応
+・CPUワード列を15文字まで拡張
+・timeLimitEnabled / timeLimitSeconds / turnStartedAtをROOM状態へ追加
+・時間切れパスをturnTokenとサーバー時刻で検証し、次手番へ進行
+・既存Worker URLは変更なし
+
+[TEST v0.15]
+・v0.15 最大15文字：クライアント/Worker上限確認 OK
+・v0.15 15文字枠：personalizedStateで15枠確認 OK
+・v0.15 時間切れ：期限到達後のみパス、期限前は拒否をWorkerロジックテスト OK
+・v0.15 PC 11〜15文字=2行 / スマホ11〜15文字=3行：CSS/描画クラス確認 OK

@@ -14,7 +14,7 @@ const SERVER_URL = WORKER_ORIGIN;
 const COMMON_MANAGER_URL = 'https://boardgame-hub-api.naitoryo7110.workers.dev';
 const COMMON_PLAYER_NAME_KEY = 'boardgamePlayerName';
 const ROOM_IDS = ['room1', 'room2', 'room3', 'room4'];
-const APP_VERSION = 'v0.17';
+const APP_VERSION = 'v0.18';
 const VERSION = '0.17';
 const ROOM_COUNT = ROOM_IDS.length;
 const NAME_DRAFT_KEY = `${GAME_ID}-name-draft`;
@@ -710,7 +710,9 @@ function renderKana() {
   if (!roomState) return;
   const me = roomState.players.find(p => p.id === roomState.meId);
   const myTurn = roomState.currentId === roomState.meId && me?.alive;
-  [...$('#kanaBoard').children].forEach(btn => {
+  const kanaBoard = $('#kanaBoard');
+  kanaBoard?.classList.toggle('my-turn-outline', !!myTurn);
+  [...kanaBoard.children].forEach(btn => {
     const k = btn.textContent;
     if (!k) return;
     const used = roomState.used.includes(k);

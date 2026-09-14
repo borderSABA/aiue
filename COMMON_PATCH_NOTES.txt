@@ -1,12 +1,12 @@
 ゲーム名：あいうえバトル
-共通化バージョン：Web v0.17
+共通化バージョン：Web v0.18
 
 [ADAPTER]
 GAME_ID = aiue-battle
 GAME_NAME = あいうえバトル
 MAX_PLAYERS = 10
 WORKER_ORIGIN = https://aiue-online.naitoryo7110.workers.dev
-APP_VERSION = v0.17
+APP_VERSION = v0.18
 
 タイトル描画箇所 = 01_GitHub用/index.html / lobbyScreen / common-title-hero
 ROOM一覧描画箇所 = 01_GitHub用/app.js / renderRooms()
@@ -20,7 +20,7 @@ Worker側保存処理 = 02_Cloudflare_Workers用/src/worker.js / save()
 CPU配列 = this.data.players の isCpu=true 要素
 ゲーム状態 = this.data.phase / used / currentIndex / turnToken / winnerId 等
 
-[v0.17 追加修正]
+[v0.18 追加修正]
 [CLIENT]
 index.html / app.js / style.css
 ・時間切れ passEvent をアタック演出と同じ中央大型オーバーレイで表示
@@ -30,7 +30,7 @@ index.html / app.js / style.css
 
 [WORKER]
 src/worker.js
-・ゲーム処理変更なし。APP_VERSIONのみ v0.17 へ更新
+・ゲーム処理変更なし。APP_VERSIONのみ v0.18 へ更新
 
 [CLIENT]
 ファイル：01_GitHub用/index.html
@@ -203,3 +203,18 @@ src/worker.js
 ・PCゲーム画面：100dvh固定 / プレイヤー枠overflow hidden / 15文字2段の固定高さCSS確認
 ・時間制限：startGame / attack / timeout pass / reconnectでAlarm再設定コード確認
 ・0秒到達：Alarm側からhandleTimeoutPass()へ進むことをコード確認
+
+[v0.18 追加修正]
+[CLIENT]
+style.css
+・現在手番プレイヤーの黄色アウトラインを太く変更
+・my-player / cpu-player の既存 inset 表示と現在手番アウトラインを両立
+・自分の手番時のみ50音盤へ黄色アウトラインを表示
+
+app.js
+renderKana()
+・myTurn 判定に合わせて #kanaBoard の my-turn-outline をON/OFF
+・他人/CPU手番では50音盤アウトラインを表示しない
+
+[WORKER]
+・変更なし

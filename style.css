@@ -545,3 +545,28 @@ button:disabled{cursor:default}
 @media (min-width:901px) and (max-height:820px){
   body.game-active .word-slots.pc-two-row .slot{height:36px!important;font-size:.95rem!important}
 }
+
+/* v0.18: stronger current-player outline + kana-board outline only on my turn */
+.player-card.current{
+  border-color:#ffd24f!important;
+  box-shadow:0 0 0 5px #ffd24fd9,0 5px 12px #0005!important;
+}
+.player-card.current.my-player{
+  border-color:#ffd24f!important;
+  box-shadow:inset 5px 0 0 #6d41c8,0 0 0 5px #ffd24fd9,0 5px 12px #0005!important;
+}
+.player-card.current.cpu-player{
+  border-color:#ffd24f!important;
+  box-shadow:inset 5px 0 0 #666,0 0 0 5px #ffd24fd9,0 5px 12px #0005!important;
+}
+.kana-board.my-turn-outline{
+  outline:5px solid #ffd24f!important;
+  outline-offset:3px!important;
+  box-shadow:0 0 22px #ffd24f8c!important;
+}
+@media(max-width:900px){
+  .player-card.current{box-shadow:0 0 0 3px #ffd24fe0,0 3px 8px #0005!important}
+  .player-card.current.my-player{box-shadow:inset 3px 0 0 #6d41c8,0 0 0 3px #ffd24fe0,0 3px 8px #0005!important}
+  .player-card.current.cpu-player{box-shadow:inset 3px 0 0 #666,0 0 0 3px #ffd24fe0,0 3px 8px #0005!important}
+  .kana-board.my-turn-outline{outline-width:3px!important;outline-offset:2px!important}
+}

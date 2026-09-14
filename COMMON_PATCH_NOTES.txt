@@ -1,12 +1,12 @@
 ゲーム名：あいうえバトル
-共通化バージョン：Web v0.16
+共通化バージョン：Web v0.17
 
 [ADAPTER]
 GAME_ID = aiue-battle
 GAME_NAME = あいうえバトル
 MAX_PLAYERS = 10
 WORKER_ORIGIN = https://aiue-online.naitoryo7110.workers.dev
-APP_VERSION = v0.16
+APP_VERSION = v0.17
 
 タイトル描画箇所 = 01_GitHub用/index.html / lobbyScreen / common-title-hero
 ROOM一覧描画箇所 = 01_GitHub用/app.js / renderRooms()
@@ -19,6 +19,18 @@ Worker側保存処理 = 02_Cloudflare_Workers用/src/worker.js / save()
 参加者配列 = this.data.players
 CPU配列 = this.data.players の isCpu=true 要素
 ゲーム状態 = this.data.phase / used / currentIndex / turnToken / winnerId 等
+
+[v0.17 追加修正]
+[CLIENT]
+index.html / app.js / style.css
+・時間切れ passEvent をアタック演出と同じ中央大型オーバーレイで表示
+・非ホストにも「現在の設定：時間制限 ON / N秒」を明示表示
+・非ホストの無効化された秒数入力も数値が明瞭に見えるCSSを追加
+・PCで11～15文字が2行になった時の文字枠高さを約2倍へ拡大
+
+[WORKER]
+src/worker.js
+・ゲーム処理変更なし。APP_VERSIONのみ v0.17 へ更新
 
 [CLIENT]
 ファイル：01_GitHub用/index.html

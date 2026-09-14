@@ -527,3 +527,21 @@ button:disabled{cursor:default}
   body.game-active .status-card{padding:3px 8px!important}
   body.game-active .message-strip{min-height:27px!important}
 }
+
+
+/* v0.17: pass overlay / timer visibility / larger PC wrapped slots */
+.time-limit-summary{margin:-4px 0 10px;padding:7px 10px;border:1px solid #5a4031;border-radius:8px;background:#17100c;color:#ead4be;font-size:.75rem;font-weight:900;text-align:center}
+.time-seconds-wrap input:disabled,.time-toggle input:disabled{opacity:1!important}
+.time-seconds-wrap input:disabled{color:#281912!important;-webkit-text-fill-color:#281912!important;background:#fff7e8!important}
+.attack-overlay.pass-mode .attack-label{color:#ffd05b;text-shadow:0 4px 0 #6d4b12}
+.attack-overlay.pass-mode .attack-kana{font-size:clamp(4rem,8vw,7rem);color:#fff3bf;text-shadow:0 7px 0 #8c6320}
+.attack-overlay.pass-mode .attack-result{color:#ffb0a7}
+@media (min-width:901px){
+  body.game-active .word-slots.pc-two-row .slot{
+    height:clamp(40px,5.7vh,58px)!important;
+    font-size:clamp(1.05rem,1.45vw,1.6rem)!important;
+  }
+}
+@media (min-width:901px) and (max-height:820px){
+  body.game-active .word-slots.pc-two-row .slot{height:36px!important;font-size:.95rem!important}
+}

@@ -14,8 +14,8 @@ const SERVER_URL = WORKER_ORIGIN;
 const COMMON_MANAGER_URL = 'https://boardgame-hub-api.naitoryo7110.workers.dev';
 const COMMON_PLAYER_NAME_KEY = 'boardgamePlayerName';
 const ROOM_IDS = ['room1', 'room2', 'room3', 'room4'];
-const APP_VERSION = 'v0.16';
-const VERSION = '0.16';
+const APP_VERSION = 'v0.17';
+const VERSION = '0.17';
 const ROOM_COUNT = ROOM_IDS.length;
 const NAME_DRAFT_KEY = `${GAME_ID}-name-draft`;
 const ACTIVE_ROOM_KEY = `${GAME_ID}-online-room`;
@@ -48,6 +48,7 @@ let selectedKana = '';
 let attackPending = false;
 let intentionalClose = false;
 let lastAttackEvent = '';
+let lastPassEvent = '';
 let toastTimer = null;
 let roomPollTimer = null;
 let cpuTurnTimer = null;
@@ -496,7 +497,9 @@ function handleServerMessage(msg) {
     return;
   }
   if (msg.type === 'passEvent') {
-    toast(`${msg.playerName || 'プレイヤー'}：時間切れでパス`, 2200);
+    if (msg.eventId && msg.eventId === lastPassEvent) return;
+    lastPassEvent = msg.eventId || '';
+    showPass(msg.playerName || 'プレイヤー');
     return;
   }
   if (msg.type === 'error') {
@@ -556,6 +559,12 @@ function renderRoomScreen() {
   $('#maxLength').value = String(roomState.maxLength || 10);
   $('#timeLimitEnabled').checked = !!roomState.timeLimitEnabled;
   $('#timeLimitSeconds').value = String(roomState.timeLimitSeconds || 30);
+  const timeSummary = $('#timeLimitSummary');
+  if (timeSummary) {
+    timeSummary.textContent = roomState.timeLimitEnabled
+      ? `現在の設定：時間制限 ON / ${Number(roomState.timeLimitSeconds || 30)}秒`
+      : '現在の設定：時間制限 OFF';
+  }
   $('#themeInput').disabled = !host;
   $('#targetCount').disabled = !host;
   $('#minLength').disabled = !host;
@@ -754,7 +763,9 @@ function renderResult() {
 
 function showAttack(name, kana, hit) {
   const overlay = $('#attackOverlay');
+  overlay.classList.remove('pass-mode');
   $('#attackName').textContent = name;
+  $('#attackLabel').textContent = '攻撃！';
   $('#attackKana').textContent = kana;
   const result = $('#attackResult');
   result.textContent = '';
@@ -765,6 +776,22 @@ function showAttack(name, kana, hit) {
     result.classList.add(hit ? 'hit' : 'miss');
   }, 650);
   setTimeout(() => overlay.classList.remove('show'), 1550);
+}
+
+function showPass(name) {
+  const overlay = $('#attackOverlay');
+  overlay.classList.add('pass-mode');
+  $('#attackName').textContent = name;
+  $('#attackLabel').textContent = '時間切れ';
+  $('#attackKana').textContent = 'パス！';
+  const result = $('#attackResult');
+  result.textContent = '次のプレイヤーへ';
+  result.className = 'attack-result miss';
+  overlay.classList.add('show');
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    overlay.classList.remove('pass-mode');
+  }, 1550);
 }
 
 function clearTurnTimer() {

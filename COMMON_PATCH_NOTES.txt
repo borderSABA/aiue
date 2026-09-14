@@ -1,12 +1,12 @@
 ゲーム名：あいうえバトル
-共通化バージョン：Web v0.18
+共通化バージョン：Web v0.19
 
 [ADAPTER]
 GAME_ID = aiue-battle
 GAME_NAME = あいうえバトル
 MAX_PLAYERS = 10
 WORKER_ORIGIN = https://aiue-online.naitoryo7110.workers.dev
-APP_VERSION = v0.18
+APP_VERSION = v0.19
 
 タイトル描画箇所 = 01_GitHub用/index.html / lobbyScreen / common-title-hero
 ROOM一覧描画箇所 = 01_GitHub用/app.js / renderRooms()
@@ -218,3 +218,12 @@ renderKana()
 
 [WORKER]
 ・変更なし
+
+
+[v0.19 追加修正]
+・時間制限タイマーの全クライアント同期を修正
+・Worker personalizedState() が serverNow / turnDeadlineAt を全参加者へ送信
+・クライアント handleServerMessage() でサーバー残時間をローカル締切へ変換
+・updateTurnTimer() は端末時計とWorker絶対時刻を直接比較しない方式へ変更
+・ホスト／非ホストで同じ残り時間表示になるよう統一
+・既存Worker URLは変更なし

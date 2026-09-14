@@ -14,7 +14,7 @@ const SERVER_URL = WORKER_ORIGIN;
 const COMMON_MANAGER_URL = 'https://boardgame-hub-api.naitoryo7110.workers.dev';
 const COMMON_PLAYER_NAME_KEY = 'boardgamePlayerName';
 const ROOM_IDS = ['room1', 'room2', 'room3', 'room4'];
-const APP_VERSION = 'v0.18';
+const APP_VERSION = 'v0.19';
 const VERSION = '0.17';
 const ROOM_COUNT = ROOM_IDS.length;
 const NAME_DRAFT_KEY = `${GAME_ID}-name-draft`;
@@ -55,6 +55,10 @@ let cpuTurnTimer = null;
 let turnTimerInterval = null;
 let timeoutSentForToken = '';
 let timeoutLastSentAt = 0;
+// Server-synchronized local deadline. Do not compare a server timestamp directly
+// against each device clock because guest devices may have clock skew.
+let syncedTurnToken = '';
+let syncedTurnDeadlineLocal = 0;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
 let commonNameSavedForSession = null;
@@ -486,6 +490,7 @@ function handleServerMessage(msg) {
   if (msg.type === 'state') {
     roomState = msg;
     attackPending = false;
+    syncTurnDeadlineFromState(msg);
     onRoomStateReceived(msg);
     routeFromState();
     return;
@@ -796,6 +801,30 @@ function showPass(name) {
   }, 1550);
 }
 
+function syncTurnDeadlineFromState(state) {
+  const token = String(state?.turnToken || '');
+  const serverNow = Number(state?.serverNow || 0);
+  const deadlineAt = Number(state?.turnDeadlineAt || 0);
+
+  if (
+    state?.phase !== 'playing'
+    || !state?.timeLimitEnabled
+    || !token
+    || !serverNow
+    || !deadlineAt
+  ) {
+    syncedTurnToken = '';
+    syncedTurnDeadlineLocal = 0;
+    return;
+  }
+
+  // Convert the server-side remaining duration into a local monotonic countdown.
+  // This keeps every client aligned even when device clocks differ.
+  const remainingMs = Math.max(0, deadlineAt - serverNow);
+  syncedTurnToken = token;
+  syncedTurnDeadlineLocal = Date.now() + remainingMs;
+}
+
 function clearTurnTimer() {
   clearInterval(turnTimerInterval);
   turnTimerInterval = null;
@@ -824,7 +853,13 @@ function updateTurnTimer() {
       clearTurnTimer();
       return;
     }
-    const endAt = Number(roomState.turnStartedAt) + Number(roomState.timeLimitSeconds || 30) * 1000;
+    const endAt =
+      syncedTurnToken === token && syncedTurnDeadlineLocal > 0
+        ? syncedTurnDeadlineLocal
+        : Date.now() + Math.max(
+            0,
+            Number(roomState.turnDeadlineAt || 0) - Number(roomState.serverNow || 0)
+          );
     const remainingMs = Math.max(0, endAt - Date.now());
     const remainingSec = Math.ceil(remainingMs / 1000);
     value.textContent = String(remainingSec);

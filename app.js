@@ -14,8 +14,8 @@ const SERVER_URL = WORKER_ORIGIN;
 const COMMON_MANAGER_URL = 'https://boardgame-hub-api.naitoryo7110.workers.dev';
 const COMMON_PLAYER_NAME_KEY = 'boardgamePlayerName';
 const ROOM_IDS = ['room1', 'room2', 'room3', 'room4'];
-const APP_VERSION = 'v0.19';
-const VERSION = '0.17';
+const APP_VERSION = 'v0.21';
+const VERSION = '0.21';
 const ROOM_COUNT = ROOM_IDS.length;
 const NAME_DRAFT_KEY = `${GAME_ID}-name-draft`;
 const ACTIVE_ROOM_KEY = `${GAME_ID}-online-room`;
@@ -63,6 +63,104 @@ let reconnectTimer = null;
 let reconnectAttempts = 0;
 let commonNameSavedForSession = null;
 let actionSeq = 0;
+
+
+// v0.21 BGM: user-provided track, infinite loop, initial volume 5%.
+const BGM_INITIAL_VOLUME = 5;
+const TURN_SOUND_INITIAL_VOLUME = 5;
+const TURN_SOUND_IDS = [
+  'turnSoundMutou',
+  'turnSoundPegasus',
+  'turnSoundYugi',
+  'turnSoundKaiba'
+];
+let bgmStarted = false;
+let lastTurnSoundToken = '';
+
+function setBgmVolume(percent) {
+  const value = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+  const audio = $('#bgmAudio');
+  if (audio) audio.volume = value / 100;
+  if ($('#bgmVolume')) $('#bgmVolume').value = String(value);
+  if ($('#bgmVolumeLabel')) $('#bgmVolumeLabel').textContent = `${value}%`;
+  if ($('#bgmTopValue')) $('#bgmTopValue').textContent = `${value}%`;
+  return value;
+}
+
+async function ensureBgmPlaying() {
+  const audio = $('#bgmAudio');
+  if (!audio || bgmStarted) return;
+  audio.loop = true;
+  audio.volume = Number($('#bgmVolume')?.value || BGM_INITIAL_VOLUME) / 100;
+  try {
+    await audio.play();
+    bgmStarted = true;
+  } catch {
+    // Browsers may block autoplay until a click/tap/key action occurs.
+  }
+}
+
+function toggleBgmPanel() {
+  const panel = $('#bgmPanel');
+  const button = $('#bgmBtn');
+  if (!panel || !button) return;
+  const willOpen = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !willOpen);
+  button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  ensureBgmPlaying();
+}
+
+function setTurnSoundVolume(percent) {
+  const value = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+  for (const id of TURN_SOUND_IDS) {
+    const audio = document.getElementById(id);
+    if (audio) audio.volume = value / 100;
+  }
+  if ($('#turnSoundVolume')) $('#turnSoundVolume').value = String(value);
+  if ($('#turnSoundVolumeLabel')) $('#turnSoundVolumeLabel').textContent = `${value}%`;
+  if ($('#turnSoundTopValue')) $('#turnSoundTopValue').textContent = `${value}%`;
+  return value;
+}
+
+function toggleTurnSoundPanel() {
+  const panel = $('#turnSoundPanel');
+  const button = $('#turnSoundBtn');
+  if (!panel || !button) return;
+  const willOpen = panel.classList.contains('hidden');
+  $('#bgmPanel')?.classList.add('hidden');
+  $('#bgmBtn')?.setAttribute('aria-expanded', 'false');
+  panel.classList.toggle('hidden', !willOpen);
+  button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+}
+
+function maybePlayTurnNotification(state) {
+  if (!state || state.phase !== 'playing') return;
+  const me = Array.isArray(state.players)
+    ? state.players.find(player => player.id === state.meId)
+    : null;
+  if (!me?.alive || state.currentId !== state.meId) return;
+
+  const token = String(
+    state.turnToken
+    || `${state.gameSessionId || 'game'}:${state.currentId || 'me'}:${state.turnStartedAt || 0}`
+  );
+  if (!token || token === lastTurnSoundToken) return;
+  lastTurnSoundToken = token;
+
+  const candidates = TURN_SOUND_IDS
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  if (!candidates.length) return;
+
+  const audio = candidates[Math.floor(Math.random() * candidates.length)];
+  audio.pause();
+  audio.currentTime = 0;
+  audio.volume = Number($('#turnSoundVolume')?.value || TURN_SOUND_INITIAL_VOLUME) / 100;
+  audio.play().catch(() => {
+    // User interaction usually unlocks media playback before a turn starts.
+    // If a browser still blocks it, skip this turn rather than replaying repeatedly.
+  });
+}
 
 function commonSavedName() {
   return String(
@@ -492,6 +590,7 @@ function handleServerMessage(msg) {
     attackPending = false;
     syncTurnDeadlineFromState(msg);
     onRoomStateReceived(msg);
+    maybePlayTurnNotification(msg);
     routeFromState();
     return;
   }
@@ -521,6 +620,7 @@ function handleServerMessage(msg) {
     selectedRoom = null;
     roomState = null;
     currentPlayerName = '';
+    lastTurnSoundToken = '';
     clearActiveRoom();
     show('lobbyScreen');
     fetchRooms();
@@ -989,6 +1089,7 @@ function leaveRoom() {
   attackPending = false;
   reconnectAttempts = 0;
   commonNameSavedForSession = null;
+  lastTurnSoundToken = '';
   clearActiveRoom();
   show('lobbyScreen');
   fetchRooms();
@@ -1055,6 +1156,36 @@ $('#closeRuleBtn').addEventListener('click', () => {
   const d = $('#ruleDialog');
   if (d.close) d.close(); else d.removeAttribute('open');
 });
+
+$('#bgmBtn').addEventListener('click', () => {
+  $('#turnSoundPanel')?.classList.add('hidden');
+  $('#turnSoundBtn')?.setAttribute('aria-expanded', 'false');
+  toggleBgmPanel();
+});
+$('#bgmVolume').addEventListener('input', event => {
+  const value = setBgmVolume(event.target.value);
+  if (value > 0) ensureBgmPlaying();
+});
+$('#turnSoundBtn').addEventListener('click', toggleTurnSoundPanel);
+$('#turnSoundVolume').addEventListener('input', event => {
+  setTurnSoundVolume(event.target.value);
+});
+
+document.addEventListener('pointerdown', event => {
+  if (!event.target.closest('#bgmPanel') && !event.target.closest('#bgmBtn')) {
+    $('#bgmPanel').classList.add('hidden');
+    $('#bgmBtn').setAttribute('aria-expanded', 'false');
+  }
+  if (!event.target.closest('#turnSoundPanel') && !event.target.closest('#turnSoundBtn')) {
+    $('#turnSoundPanel').classList.add('hidden');
+    $('#turnSoundBtn').setAttribute('aria-expanded', 'false');
+  }
+  ensureBgmPlaying();
+}, { capture: true });
+document.addEventListener('keydown', ensureBgmPlaying, { capture: true });
+
+setBgmVolume(BGM_INITIAL_VOLUME);
+setTurnSoundVolume(TURN_SOUND_INITIAL_VOLUME);
 
 makeNumberOptions();
 

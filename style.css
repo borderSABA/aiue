@@ -570,3 +570,37 @@ button:disabled{cursor:default}
   .player-card.current.cpu-player{box-shadow:inset 3px 0 0 #666,0 0 0 3px #ffd24fe0,0 3px 8px #0005!important}
   .kana-board.my-turn-outline{outline-width:3px!important;outline-offset:2px!important}
 }
+
+
+/* v0.21: looping BGM + random own-turn notification sounds / 1% volume controls */
+.bgm-button,.turn-sound-button{white-space:nowrap}
+.bgm-panel{
+  position:fixed;
+  top:64px;
+  right:12px;
+  z-index:75;
+  width:min(290px,calc(100vw - 24px));
+  padding:12px 14px;
+  border:1px solid #76503a;
+  border-radius:12px;
+  background:#1d130f;
+  box-shadow:0 10px 30px #0009;
+}
+.bgm-panel-title{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  margin-bottom:9px;
+  color:#f4e5d3;
+  font-size:.82rem;
+  font-weight:900;
+}
+.bgm-panel-title b{color:#f1c66d;font-size:1rem}
+.bgm-slider-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;color:#baa38e;font-size:.65rem;font-weight:800}
+#bgmVolume,#turnSoundVolume{width:100%;margin:0;accent-color:#e0a940;cursor:pointer}
+@media(max-width:900px){
+  .bgm-panel{top:52px;right:6px;width:min(250px,calc(100vw - 12px));padding:10px 11px}
+  .bgm-button,.turn-sound-button{padding-left:5px;padding-right:5px}
+  .turn-sound-panel{right:6px}
+}

@@ -4,20 +4,44 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#17110d">
-  <title>あいうえバトル Web v0.19</title>
-  <link rel="stylesheet" href="style.css?v=0.18">
+  <title>あいうえバトル Web v0.21</title>
+  <link rel="stylesheet" href="style.css?v=0.21">
 </head>
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="brand">あいうえバトル <span>Web v0.19</span></div>
+    <div class="brand">あいうえバトル <span>Web v0.21</span></div>
     <div class="room-chip" id="roomChip">ロビー</div>
     <div class="top-actions">
+      <button class="small bgm-button" id="bgmBtn" type="button" aria-expanded="false">BGM <span id="bgmTopValue">5%</span></button>
+      <button class="small turn-sound-button" id="turnSoundBtn" type="button" aria-expanded="false">通知 <span id="turnSoundTopValue">5%</span></button>
       <button class="small hidden" id="logBtn">ログ</button>
       <button class="small" id="ruleBtn">ルール</button>
       <button class="small hidden" id="leaveRoomBtn">退出</button>
     </div>
   </header>
+
+  <div id="bgmPanel" class="bgm-panel hidden" aria-label="BGM音量設定">
+    <div class="bgm-panel-title">BGM音量 <b id="bgmVolumeLabel">5%</b></div>
+    <div class="bgm-slider-row">
+      <span>0%</span>
+      <input id="bgmVolume" type="range" min="0" max="100" step="1" value="5" aria-label="BGM音量">
+      <span>100%</span>
+    </div>
+  </div>
+  <div id="turnSoundPanel" class="bgm-panel turn-sound-panel hidden" aria-label="ターン通知音量設定">
+    <div class="bgm-panel-title">ターン通知音量 <b id="turnSoundVolumeLabel">5%</b></div>
+    <div class="bgm-slider-row">
+      <span>0%</span>
+      <input id="turnSoundVolume" type="range" min="0" max="100" step="1" value="5" aria-label="ターン通知音量">
+      <span>100%</span>
+    </div>
+  </div>
+  <audio id="bgmAudio" src="assets/MEGALOVANIA.m4a" loop preload="auto" playsinline></audio>
+  <audio id="turnSoundMutou" src="assets/turn_mutou.m4a" preload="auto" playsinline></audio>
+  <audio id="turnSoundPegasus" src="assets/turn_pegasus.m4a" preload="auto" playsinline></audio>
+  <audio id="turnSoundYugi" src="assets/turn_yugi.m4a" preload="auto" playsinline></audio>
+  <audio id="turnSoundKaiba" src="assets/turn_kaiba.m4a" preload="auto" playsinline></audio>
 
   <main>
     <section id="lobbyScreen" class="screen active lobby-screen">
@@ -25,7 +49,7 @@
         <div class="lobby-hero common-title-hero">
           <div class="common-title-row">
             <h1>あいうえバトル</h1>
-            <div class="version-badge">Web v0.19</div>
+            <div class="version-badge">Web v0.21</div>
           </div>
           <div class="online-name-row">
             <label for="playerNameInput">プレイヤー名</label>
@@ -169,7 +193,7 @@
     <button class="primary" id="closeRuleBtn">閉じる</button>
   </dialog>
 </div>
-<script src="config.js?v=0.18"></script>
-<script src="app.js?v=0.18"></script>
+<script src="config.js?v=0.21"></script>
+<script src="app.js?v=0.21"></script>
 </body>
 </html>

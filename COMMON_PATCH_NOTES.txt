@@ -1,12 +1,12 @@
 ゲーム名：あいうえバトル
-共通化バージョン：Web v0.19
+共通化バージョン：Web v0.21
 
 [ADAPTER]
 GAME_ID = aiue-battle
 GAME_NAME = あいうえバトル
 MAX_PLAYERS = 10
 WORKER_ORIGIN = https://aiue-online.naitoryo7110.workers.dev
-APP_VERSION = v0.19
+APP_VERSION = v0.21
 
 タイトル描画箇所 = 01_GitHub用/index.html / lobbyScreen / common-title-hero
 ROOM一覧描画箇所 = 01_GitHub用/app.js / renderRooms()
@@ -227,3 +227,43 @@ renderKana()
 ・updateTurnTimer() は端末時計とWorker絶対時刻を直接比較しない方式へ変更
 ・ホスト／非ホストで同じ残り時間表示になるよう統一
 ・既存Worker URLは変更なし
+
+
+[v0.20 追加修正]
+[CLIENT]
+index.html
+・トップバーにBGM音量ボタンを追加
+・BGM音量パネルを追加
+・assets/MEGALOVANIA.m4a をaudio要素で無限ループ再生
+
+app.js
+・BGM初期音量5%
+・音量0〜100%、1%刻み
+・最初のユーザー操作時に自動再生開始（ブラウザ自動再生制限対応）
+
+style.css
+・PC/スマホ共通のBGM音量ポップアップUIを追加
+
+[WORKER]
+・変更なし
+
+
+[v0.21 追加修正]
+[CLIENT]
+index.html
+・トップバーに「通知 5%」ボタンを追加
+・ターン通知音量パネル（0〜100%、1%刻み、初期5%）を追加
+・ユーザー提供のターン通知音4種類を assets に追加
+
+app.js
+・自分のターン開始時のみ4種類からランダムで1つ再生
+・turnToken単位で1回だけ再生し、同じ手番のstate再受信では再生しない
+・ターン通知音量を0〜100%、1%刻みで変更可能
+・BGM音量とは独立して管理
+
+style.css
+・ターン通知音量ボタン/パネルをBGM設定UIと同系統で追加
+・スマホトップバーで音量ボタンを少し圧縮
+
+[WORKER]
+・変更なし
